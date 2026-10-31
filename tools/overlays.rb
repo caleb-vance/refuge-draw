@@ -175,13 +175,22 @@ def trim(g)
   g.is_a?(Array) ? (g.first.is_a?(Numeric) ? g.map { |n| n.round(5) } : g.map { |x| trim(x) }) : g
 end
 features = []
+def unit_kind(name, closed)
+  return 'closed' if closed
+  case name.to_s
+  when /Assigned Pond/i then 'ponds'
+  when /Free Roam/i then 'free'
+  when /Pheasant|Upland/i then 'upland'
+  else 'unit'
+  end
+end
 orgs = %w[Sacramento Delevan Colusa Sutter Kern].map { |n| "#{n} National Wildlife Refuge" } + ['San Luis National Wildlife Refuge', 'Merced National Wildlife Refuge']
 where = "Organization_Name IN (#{orgs.map { |o| "'#{o}'" }.join(',')})"
 geojson(FWS, where, 'Organization_Name,Hunt_Unit_Name,Huntable').each do |f|
   p = f['properties']
   closed = p['Huntable'] == 'No' || p['Hunt_Unit_Name'].to_s =~ /closed/i
   features << { type: 'Feature', geometry: { type: f['geometry']['type'], coordinates: trim(f['geometry']['coordinates']) },
-                properties: { src: 'USFWS', area: p['Organization_Name'], unit: p['Hunt_Unit_Name'], status: closed ? 'closed' : 'open' } }
+                properties: { src: 'USFWS', area: p['Organization_Name'], unit: p['Hunt_Unit_Name'], status: closed ? 'closed' : 'open', kind: unit_kind(p['Hunt_Unit_Name'], closed) } }
 end
 names = ['Ash Creek', 'Butte Valley', 'Gray Lodge', 'Grizzly Island', 'Honey Lake', 'Imperial', 'Los Banos', 'Mendota', 'North Grasslands',
          'San Jacinto', 'Shasta Valley', 'Upper Butte Basin', 'Volta', 'Willow Creek', 'Yolo Bypass'].map { |n| "#{n} Wildlife Area" }
@@ -193,3 +202,29 @@ end
 File.write(File.join(ROOT, 'public/boundaries.json'), JSON.generate(type: 'FeatureCollection', features: features))
 warn "overlays: #{done.values.compact.size} maps, boundaries: #{features.size} features, #{File.size(File.join(ROOT, 'public/boundaries.json')) / 1024} KB"
 warn "no GPS overlay: #{refuges.reject { |r| manifest.any? { |m| m[:refuge] == r['id'] } }.map { |r| r['id'] }.join(', ')}"
+
+# Official USFWS blind and parking points for the refuges above.
+FWS_ROOT = 'https://services.arcgis.com/QVENGdaPbd4LUkLV/arcgis/rest/services'.freeze
+def points(layer, id, where, fields)
+  q = URI.encode_www_form(where: where, outFields: fields, returnGeometry: true, outSR: 4326, f: 'geojson', resultRecordCount: 2000)
+  JSON.parse(fetch("#{FWS_ROOT}/#{layer}/FeatureServer/#{id}/query?#{q}"))['features']
+end
+meta = JSON.parse(fetch("#{FWS_ROOT}/FWS_HQ_Parking_Public/FeatureServer/59?f=json"))
+pfields = meta['fields'].map { |f| f['name'] }
+warn "parking fields: #{pfields.join(',')}"
+orgs_up = orgs.map(&:upcase)
+facilities = []
+points('FWS_HQ_Fac_Blind_PublicView', 0, "OrgName IN (#{orgs_up.map { |x| "'#{x}'" }.join(',')})", 'OrgName,Blind_Name,Blind_Regs,Han_Access,Blind_Use,Public_View,Status').each do |f|
+  p = f['properties']
+  next unless f['geometry'] && p['Blind_Use'].to_s =~ /hunt/i && p['Status'] != 'Invalid'
+  c = f['geometry']['coordinates']
+  facilities << { t: 'blind', area: p['OrgName'], name: p['Blind_Name'], regs: p['Blind_Regs'], ada: p['Han_Access'] == 'Yes', ll: [c[1].round(6), c[0].round(6)] }
+end
+points('FWS_HQ_Parking_Public', 59, "ORGNAME IN (#{orgs.map { |x| "'#{x}'" }.join(',')})", 'ORGNAME,ROUTE_NAME,CENT_LAT,CENT_LON,PUBLICDISPLAY,USER_ACCESS,ROUTE_STATUS,REMARKS').each do |f|
+  p = f['properties']
+  # Leave out visitor lots such as tour routes and fishing access.
+  next unless p['CENT_LAT'] && p['ROUTE_NAME'].to_s =~ /hunt|Pkg Lot [A-D]|Staging|Boat|Blind|Accessible/i && p['ROUTE_NAME'] !~ /Auto Tour|Visitor|Trail|Fishing|Observation|Photo Blind/i
+  facilities << { t: 'parking', area: p['ORGNAME'].upcase, name: p['ROUTE_NAME'].sub(/\s*Pkg\z/, '').sub(/ Pkg /, ' '), regs: nil, ada: false, ll: [p['CENT_LAT'].to_f.round(6), p['CENT_LON'].to_f.round(6)] }
+end
+File.write(File.join(ROOT, 'public/facilities.json'), JSON.generate(facilities))
+facilities.group_by { |x| [x[:area], x[:t]] }.sort_by { |k, _| k.join }.each { |k, v| warn "#{k.join(' / ')}: #{v.size}  e.g. #{v.first(3).map { |x| x[:name] }.join('; ')}" }

@@ -52,7 +52,18 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:3px 10px;background:rgba(13,15,17,.86);border-radius:8px;padding:5px 9px;font-size:11px;pointer-events:none}
 #legend div{display:flex;align-items:center;gap:4px;white-space:nowrap}
 .sheet-full #legend{display:none}
-.focused #legend{display:none}
+.fac{display:block;box-sizing:border-box}
+.fac.blind{width:13px;height:13px;margin:1.500px;border-radius:50%;background:#fff;border:3px solid #0d0f11;box-shadow:0 0 0 1px #fff}
+.fac.blind.ada{background:#4da3ff}
+.fac.park{width:20px;height:20px;border-radius:4px;background:#1558d6;color:#fff;font:800 13px/20px var(--body);text-align:center;border:1px solid #fff}
+#legend i.fac{flex:none;font-style:normal}
+#legend i.fac.park{width:14px;height:14px;font-size:10px;line-height:13px}
+#legend i.fac.blind{width:10px;height:10px;margin:0;border-width:2px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;flex:none;opacity:.9}
+.sw.line{background:none;border:2px solid #fff}
+#viewer{position:absolute;inset:0;z-index:2000;background:var(--bg);overflow:auto;-webkit-overflow-scrolling:touch}
+#viewer img{display:block;width:100%;min-width:640px;max-width:none;background:#fff}
+#viewer button{position:sticky;top:10px;left:10px;margin:10px;z-index:1}
 .wp{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
 .pinrow{display:block}
 .daycards{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
@@ -149,7 +160,6 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
   #handle{display:none}
   #legend{left:calc(100% + 12px);right:auto;bottom:12px;width:max-content}
   .sheet-full #legend{display:flex}
-  .focused #legend{display:none}
   nav button{padding-top:13px}
   #brand{left:414px}
   .sheet-full #top{display:flex}
@@ -170,10 +180,12 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
       <div class="seg"><button id="base-sat" aria-pressed="true">Satellite</button><button id="base-topo" aria-pressed="false">Topo</button></div>
       <label class="chk"><input type="checkbox" id="l-overlay" checked>Hunt map</label>
       <div><label for="l-opacity" class="quiet">Hunt map strength</label><input type="range" id="l-opacity" min="20" max="100" value="85"></div>
-      <label class="chk"><input type="checkbox" id="l-bounds" checked>Boundaries</label>
-      <p class="quiet">Green is a hunt unit, red is closed, and white is a state property line.</p>
+      <label class="chk"><input type="checkbox" id="l-bounds" checked>Boundaries and unit types</label>
+      <label class="chk"><input type="checkbox" id="l-fac" checked>Blinds and parking</label>
+      <p class="quiet">Pick a refuge to see its map key.</p>
     </div>
   </div>
+  <div id="viewer" hidden role="dialog" aria-label="Full hunt map"></div>
   <div id="note" hidden role="status"></div>
   <div id="sheet">
     <div id="legend" aria-label="Marker legend"></div>
@@ -443,6 +455,7 @@ function initMap(){
       onEachFeature: bindBoundary
     });
     setFocus(selected);
+    fetch('facilities.json').then(r => r.json()).then(x => { facilities = x; if (selected) setFocus(selected); }).catch(() => {});
     /* Boundaries are better than hand-placed pins, so move each pin to its unit's center. */
     REFUGES.forEach(r => {
       if (!AREA[r.id] || r.id === 'joice') return;
@@ -460,16 +473,60 @@ function fitOpts(){
   const wide = innerWidth >= 860;
   return wide ? {paddingTopLeft:[440, 30], paddingBottomRight:[30, 30]} : {paddingTopLeft:[16, 60], paddingBottomRight:[16, sheetCover() + (selected ? 16 : 70)]};
 }
-const boundaryStyle = f => {
-  const s = f.properties.status;
-  if (s === 'closed') return {color:'#ff5c4d', weight:1.5, fillColor:'#ff5c4d', fillOpacity:.25};
-  if (s === 'open') return {color:'#7ee081', weight:1.5, fillColor:'#7ee081', fillOpacity:.08};
-  return {color:'#ffffff', weight:1.5, opacity:.8, fill:false};
+const UNIT_KIND = {
+  free:{label:'Free roam', color:'#7ee081'},
+  ponds:{label:'Assigned ponds and blinds', color:'#4da3ff'},
+  upland:{label:'Upland game only', color:'#ffd23f'},
+  unit:{label:'Hunt unit (see PDF for zones)', color:'#c58bff'},
+  closed:{label:'Closed to hunting', color:'#ff5c4d'}
 };
+const boundaryStyle = f => {
+  const k = UNIT_KIND[f.properties.kind];
+  if (!k) return {color:'#ffffff', weight:1.5, opacity:.8, fill:false};
+  return {color:k.color, weight:2, fillColor:k.color, fillOpacity:f.properties.kind === 'closed' ? .3 : .18};
+};
+let facilities = [], facilityLayer = null;
+const FAC_ICON = {
+  blind: a => L.divIcon({className:'', iconSize:[16, 16], iconAnchor:[8, 8], html:`<div class="fac blind${a ? ' ada' : ''}"></div>`}),
+  parking: () => L.divIcon({className:'', iconSize:[20, 20], iconAnchor:[10, 10], html:'<div class="fac park">P</div>'})
+};
+function focusedFacilities(id){
+  const spec = AREA[id], area = spec ? spec[0] : MASK[id];
+  if (!area) return [];
+  let list = facilities.filter(f => f.area === area.toUpperCase());
+  if (id === 'bearcreek') list = list.filter(f => /WBC|EBC|Bear Creek/i.test(f.name || ''));
+  const b = spec && spec[1] ? refugeBounds(id) : null;
+  return b && b.isValid() ? list.filter(f => b.pad(.02).contains(f.ll)) : list;
+}
+function drawFacilities(id){
+  if (facilityLayer) { map.removeLayer(facilityLayer); facilityLayer = null; }
+  if (!id || !$('#l-fac').checked) return;
+  facilityLayer = L.layerGroup(focusedFacilities(id).map(f => {
+    const m = L.marker(f.ll, {icon:FAC_ICON[f.t](f.ada), title:f.name || ''});
+    m.bindPopup(`<b>${esc(f.name || (f.t === 'parking' ? 'Parking' : 'Blind'))}</b>${f.ada ? 'Accessible blind<br>' : ''}${f.regs ? esc(f.regs) + '<br>' : ''}<span class="quiet">Source: USFWS</span>`);
+    return m;
+  })).addTo(map);
+}
+function keyFor(id){
+  const spec = AREA[id], area = spec ? spec[0] : MASK[id], unit = spec && spec[1];
+  const kinds = [...new Set(boundaryFeatures.filter(f => f.properties.area === area && (!unit || f.properties.unit === unit)).map(f => f.properties.kind).filter(Boolean))];
+  const order = ['free', 'ponds', 'upland', 'unit', 'closed'].filter(k => kinds.includes(k));
+  const fac = focusedFacilities(id), rows = order.map(k => `<div><i class="sw" style="background:${UNIT_KIND[k].color}"></i><span>${esc(UNIT_KIND[k].label)}</span></div>`);
+  if (fac.some(f => f.t === 'blind')) rows.push('<div><i class="fac blind"></i><span>Blind</span></div>');
+  if (fac.some(f => f.ada)) rows.push('<div><i class="fac blind ada"></i><span>Accessible blind</span></div>');
+  if (fac.some(f => f.t === 'parking')) rows.push('<div><i class="fac park">P</i><span>Parking</span></div>');
+  if (!order.length && boundaryFeatures.some(f => f.properties.area === area)) rows.push('<div><i class="sw line"></i><span>State property line</span></div>');
+  return rows;
+}
+function drawLegend(id){
+  $('#legend').innerHTML = id ? keyFor(id).join('') : Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
+  $('#legend').hidden = !$('#legend').innerHTML;
+}
 let focusLayer = null;
 /* Selected refuge: its pin and boundary only. No selection: every refuge. */
 function setFocus(id){
   document.body.classList.toggle('focused', !!id);
+  drawLegend(id);
   REFUGES.forEach(r => { const m = markers[r.id]; if (!m || !map) return; if (!id || r.id === id) m.addTo(map); else m.remove(); });
   if (!map) return;
   if (focusLayer) { map.removeLayer(focusLayer); focusLayer = null; }
@@ -480,6 +537,7 @@ function setFocus(id){
     const fs = boundaryFeatures.filter(f => f.properties.area === area && (!unit || f.properties.unit === unit));
     if (fs.length) focusLayer = L.geoJSON({type:'FeatureCollection', features:fs}, {style:boundaryStyle, onEachFeature:bindBoundary}).addTo(map);
   }
+  drawFacilities(id);
 }
 function setOverlay(meta){
   if (activeOverlay) { map.removeLayer(activeOverlay); activeOverlay = null; }
@@ -558,6 +616,7 @@ function initControls(){
   $('#base-sat').onclick = () => base('sat');
   $('#base-topo').onclick = () => base('topo');
   $('#l-bounds').onchange = () => setFocus(selected);
+  $('#l-fac').onchange = () => drawFacilities(selected);
   $('#l-overlay').onchange = () => setOverlay(activeOverlayMeta);
   $('#l-opacity').oninput = e => { overlayOpacity = e.target.value / 100; if (activeOverlay) activeOverlay.setOpacity(overlayOpacity); };
   let me;
@@ -619,12 +678,12 @@ function birdPage(r){
     const peak = Math.max(...s.rows.map(x => x.avg || 0), 1);
     html += `<section><div class="kicker">2026-27 season so far</div><div class="big">${s.avg.toFixed(1)}</div><p class="quiet">birds per hunter, across ${s.days} hunt day${s.days === 1 ? '' : 's'}</p></section>
       <div class="stats"><div><b>${(s.ducks / s.hunters).toFixed(1)}</b><span>Ducks per hunter</span></div><div><b>${(s.geese / s.hunters).toFixed(1)}</b><span>Geese per hunter</span></div><div><b>${num(s.hunters)}</b><span>Hunter visits</span></div></div>
-      <section><h3>By hunt day</h3><div class="bars">${s.rows.slice(0, 12).map(x => `<div class="bar"><span>${esc(x.date)}</span><i style="width:${Math.round((x.avg || 0) / peak * 100)}%"></i><span>${x.avg == null ? '–' : x.avg.toFixed(1)}</span></div>`).join('')}</div></section>
-      <section><h3>Species shot</h3>${speciesBars(s.species, s.days)}<p class="quiet">Number of hunt days each species ranked first or second. CDFW reports only the top two species per day, so this is not a full species count.</p></section>`;
+      <section><h3>Birds per hunter, by hunt day</h3><div class="bars">${s.rows.slice(0, 12).map(x => `<div class="bar"><span>${esc(x.date)}</span><i style="width:${Math.round((x.avg || 0) / peak * 100)}%"></i><span>${x.avg == null ? '–' : x.avg.toFixed(1)}</span></div>`).join('')}</div></section>
+      <section><h3>Species shot</h3><p class="quiet">Hunt days, out of ${s.days}, each species ranked in that day's top two. These are not bird counts, because CDFW reports only the top two species per day.</p>${speciesBars(s.species, s.days)}</section>`;
   } else {
     html += '<p class="quiet">No 2026-27 results for this unit yet.</p>';
   }
-  if (l) html += `<section><h3>Last season, 2025-26</h3><div class="stats"><div><b>${l.avg.toFixed(1)}</b><span>Birds per hunter</span></div><div><b>${l.days}</b><span>Hunt days</span></div><div><b>${num(l.hunters)}</b><span>Hunter visits</span></div></div>${speciesBars(l.species, l.days)}</section>`;
+  if (l) html += `<section><h3>Last season, 2025-26</h3><div class="stats"><div><b>${l.avg.toFixed(1)}</b><span>Birds per hunter</span></div><div><b>${l.days}</b><span>Hunt days</span></div><div><b>${num(l.hunters)}</b><span>Hunter visits</span></div></div><p class="quiet">Average birds per hunter across the whole season.</p><h3>Last season's species</h3><p class="quiet">Hunt days, out of ${l.days}, each species ranked in that day's top two. These are not bird counts.</p>${speciesBars(l.species, l.days)}</section>`;
   return html;
 }
 function renderBirds(){
@@ -632,7 +691,7 @@ function renderBirds(){
     .sort((a, b) => (b.s ? b.s.avg : -1) - (a.s ? a.s.avg : -1) || (b.l ? b.l.avg : 0) - (a.l ? a.l.avg : 0));
   $('#birdview').innerHTML = `<div class="pad" style="padding-bottom:6px"><div><h2>Bird averages</h2><p class="quiet">Birds per hunter this season, highest first. Early-season numbers can rest on only a few hunters. Tap a refuge for its species.</p></div></div>` + rows.map(({r, s, l}) => {
     const top = s ? Object.entries(s.species).sort((a, b) => b[1] - a[1])[0] : null;
-    return `<button class="row" data-id="${r.id}" data-birds="1"><span class="pinrow">${pinSvg(VAC[r.vacType].color, 18)}</span><span class="txt"><b>${esc(r.name)}</b><small>${top ? esc(SPECIES[top[0]] || top[0]) + ' most often on top' : 'No results yet this season'}</small></span><span class="odds">${s ? s.avg.toFixed(1) : '–'}<span>${l ? 'last yr ' + l.avg.toFixed(1) : 'per hunter'}</span></span></button>`;
+    return `<button class="row" data-id="${r.id}" data-birds="1"><span class="pinrow">${pinSvg(VAC[r.vacType].color, 18)}</span><span class="txt"><b>${esc(r.name)}</b><small>${top ? esc(SPECIES[top[0]] || top[0]) + ' most often on top' : 'No results yet this season'}</small></span><span class="odds">${s ? s.avg.toFixed(1) : '–'}<span>birds per hunter</span><span>${l ? 'last yr ' + l.avg.toFixed(1) : ''}</span></span></button>`;
   }).join('');
 }
 function timeline(r, hunt){
@@ -728,7 +787,7 @@ function openDetail(id, keepScroll){
     <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button></div>
     <div id="pane-birds" class="pad" style="padding:0" ${detailPane === 'birds' ? '' : 'hidden'}>${birdPage(r)}</div>
     <div id="pane-plan" class="pad" style="padding:0" ${detailPane === 'plan' ? '' : 'hidden'}>
-    ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><p class="quiet">Placed from the PDF's GPS data and cut to the official boundary.</p></section>` : `<div class="warn">This hunt map has no GPS data, so it can't be laid on the imagery. ${AREA[r.id] ? 'The official boundary is drawn instead. Open' : 'Open'} the PDF for the zones.</div>`}
+    ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><button class="btn" id="fullkey">See full map and its key</button><p class="quiet">Placed from the PDF's GPS data and cut to the official boundary. The full map shows the area types and symbols this refuge uses.</p></section>` : `<div class="warn">The hunt map PDF has no GPS data, so it isn't laid on the imagery. ${focusedFacilities(r.id).length ? 'Official blind and parking points are shown instead. Numbered ponds and zones are in the PDF.' : 'The official boundary is drawn instead. Zones are in the PDF.'}</div>`}
     <div class="kicker">Official PDFs</div>
     <div class="btns">
       ${huntMaps.map((m, i) => link(m.url, m.label, i === 0 ? 'btn main' : 'btn')).join('')}
@@ -761,6 +820,7 @@ function openDetail(id, keepScroll){
   el.hidden = false;
   el.scrollTop = keepScroll ? scroll : 0;
   $('#back').onclick = closeDetail;
+  const fk = $('#fullkey'); if (fk) fk.onclick = () => { const v = $('#viewer'), cur = activeOverlayMeta || ovs[0]; v.innerHTML = `<button class="btn main" id="vclose">Close</button><img src="${esc(cur.img)}" alt="${esc(cur.label)}">`; v.hidden = false; $('#vclose').onclick = () => { v.hidden = true; }; };
   el.querySelectorAll('[data-pane]').forEach(b => { b.onclick = () => { detailPane = b.dataset.pane; openDetail(id, true); }; });
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
@@ -892,7 +952,7 @@ document.addEventListener('click', e => {
   const row = e.target.closest('.row'); if (row) { detailPane = row.dataset.birds ? 'birds' : 'plan'; setTab('map'); openDetail(row.dataset.id); return; }
 });
 
-$('#legend').innerHTML = Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
+drawLegend(null);
 initSheet(); initControls(); renderList(); renderHow(); renderAll(); initMap();
 
 /* On a server, swap in live data. As a static page this request fails and the built-in copy stays. */

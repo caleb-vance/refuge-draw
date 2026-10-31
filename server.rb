@@ -39,6 +39,7 @@ server.mount_proc('/api/live') do |_req, res|
 end
 
 server.mount('/overlays', WEBrick::HTTPServlet::FileHandler, File.join(ROOT, 'public/overlays'))
+server.mount('/facilities.json', WEBrick::HTTPServlet::FileHandler, File.join(ROOT, 'public/facilities.json'))
 server.mount('/boundaries.json', WEBrick::HTTPServlet::FileHandler, File.join(ROOT, 'public/boundaries.json'))
 
 server.mount_proc('/') do |req, res|
