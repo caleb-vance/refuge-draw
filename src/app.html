@@ -1,16 +1,17 @@
 <title>Refuge Rat</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%230d0f11'/%3E%3Cpath fill='%23f2c230' d='M14 34C14 23 22 16 30 17c4 .4 7 3 9 6l6 5c1 1 .5 2.500-1 2.500H38c-3 3-8 4.500-13 4.500-6 0-11-.5-11-1z'/%3E%3Ccircle cx='31' cy='15' r='5.500' fill='%23f2c230'/%3E%3Cpath d='M15 33C6 33 3 27 6 21S14 12 9 6' fill='none' stroke='%23f2c230' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-2 -6 70 68'%3E%3Crect x='-2' y='-6' width='70' height='68' rx='12' fill='%230a1c16'/%3E%3Cpath d='M15 39C7 40 3 33 7 27 9 24 8 20 4 19' fill='none' stroke='%23e7a59a' stroke-width='2.600' stroke-linecap='round'/%3E%3Cpath fill='%23b9bfb6' d='M14 39C14 30 25 26 37 27 46 28 52 32 52 39 52 47 43 51 32 51 22 51 14 47 14 39Z'/%3E%3Cpath fill='%237b4427' d='M41 28C48 29 53 33 53 39 53 45 48 49 42 50 45 43 45 35 41 28Z'/%3E%3Cpath fill='%2314704d' d='M41 23H51L52 31H42Z'/%3E%3Ccircle cx='46' cy='17' r='10' fill='%2314704d'/%3E%3Cpath d='M41 31.500 53 30.500' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3Cpath fill='%23efbe2f' d='M54 16 63 19C64 21 61 24 54 23Z'/%3E%3Ccircle cx='48' cy='14' r='1.700' fill='%230a1c16'/%3E%3Cpath fill='%233b78e6' stroke='%23fff' stroke-width='1.500' d='M24 37 36 36 34 44 25 44Z'/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,500;100,700;125,800&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>/*LEAFLET_CSS*/</style>
 <style>
-/* Layout: the map is the page, one quiet sheet holds everything else. Few colors, thin lines, no ornament.
-   Color: near-black with one signal yellow, for a phone read in the dark before shoot time. */
+/* Layout: the map is the page, one quiet sheet holds everything else.
+   Color: a mallard drake. Bottle-green head for surfaces, neck-ring cream for text, bill yellow for action,
+   chestnut breast for section labels, wing-patch blue for the active tab. */
 :root{
   color-scheme:dark;
-  --bg:#0d0f11;--surface:#16191c;--raised:#1f2327;--line:#2a2f34;--ink:#f3f4f2;--muted:#9aa1a6;
-  --accent:#f2c230;--accent-ink:#141104;--red:#ff5c4d;--green:#7ee081;
-  --warn-bg:#2b2410;--warn:#f2d680;
+  --bg:#0a1c16;--surface:#11291f;--raised:#1b3d2f;--line:#2a4f3f;--ink:#f6f3e7;--muted:#a9bcae;
+  --accent:#efbe2f;--accent-ink:#1c1403;--chestnut:#d0926a;--speculum:#5b93f0;--red:#ff5c4d;--green:#7ee081;
+  --warn-bg:#3a2a18;--warn:#f0cfa0;
   --display:"Archivo",system-ui,sans-serif;
   --body:"Archivo",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -24,21 +25,21 @@ body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);font-s
 .leaflet-container{font-family:var(--body);background:var(--bg)}
 h2,h3{font-family:var(--display);line-height:1.12;margin:0;text-wrap:balance}
 h2{font-size:24px;font-weight:700}
-h3{font-size:16px;font-weight:700}
+h3{font-size:16px;font-weight:700;color:var(--chestnut)}
 p{margin:0}
 a{color:var(--accent)}
 button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* top of the map */
-#brand{position:absolute;z-index:500;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:8px;background:rgba(13,15,17,.86);border-radius:10px;padding:5px 12px 5px 6px;pointer-events:none}
-#brand svg{width:34px;height:34px;flex:none}
+#brand{position:absolute;z-index:500;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:8px;background:rgba(10,28,22,.86);border-radius:10px;padding:5px 12px 5px 6px;pointer-events:none}
+#brand svg{width:44px;height:37px;flex:none}
 #brand span{font:800 18px/1 var(--display);font-stretch:125%;letter-spacing:-.01em;white-space:nowrap}
 #top{position:absolute;z-index:900;top:calc(env(safe-area-inset-top,0px) + 10px);right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;align-items:flex-end}
-#shoot{background:rgba(13,15,17,.86);border-radius:10px;padding:6px 11px;text-align:right;line-height:1.15;font-variant-numeric:tabular-nums}
+#shoot{background:rgba(10,28,22,.86);border-radius:10px;padding:6px 11px;text-align:right;line-height:1.15;font-variant-numeric:tabular-nums}
 #shoot small{display:block;font-size:11px;color:var(--muted)}
 #shoot b{display:block;font:700 19px/1.1 var(--display);color:var(--accent);white-space:nowrap}
 .tools{display:flex;gap:8px}
-.tool{all:unset;box-sizing:border-box;cursor:pointer;width:42px;height:42px;display:grid;place-items:center;background:rgba(13,15,17,.86);border-radius:10px;color:var(--ink)}
+.tool{all:unset;box-sizing:border-box;cursor:pointer;width:42px;height:42px;display:grid;place-items:center;background:rgba(10,28,22,.86);border-radius:10px;color:var(--ink)}
 .tool[aria-expanded="true"]{background:var(--accent);color:var(--accent-ink)}
 .tool svg{width:21px;height:21px}
 #layers{width:min(260px,calc(100vw - 24px));background:var(--surface);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:11px;font-size:14px}
@@ -49,7 +50,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
 .chk input{accent-color:var(--accent);width:18px;height:18px;margin:0;flex:none}
 input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #note{position:absolute;z-index:500;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 110px);background:var(--surface);border-radius:8px;padding:7px 11px;font-size:13px;width:max-content;max-width:calc(100vw - 32px)}
-#legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:3px 10px;background:rgba(13,15,17,.86);border-radius:8px;padding:5px 9px;font-size:11px;max-height:40vh;overflow-y:auto}
+#legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:3px 10px;background:rgba(10,28,22,.86);border-radius:8px;padding:5px 9px;font-size:11px;max-height:40vh;overflow-y:auto}
 #legend div{display:flex;align-items:center;gap:4px;white-space:nowrap}
 .sheet-full #legend{display:none}
 .fac{display:block;box-sizing:border-box}
@@ -76,19 +77,19 @@ ul.signup li{background:var(--surface);border-radius:8px;padding:9px 12px}
 ul.signup b{display:block;font-weight:700}
 .pin{width:13px;height:13px;border-radius:50%;background:var(--accent);border:2px solid #0d0f11;box-shadow:0 0 0 1.500px var(--accent)}
 .pin.sel{background:#fff;box-shadow:0 0 0 3px var(--accent)}
-.leaflet-tooltip.pinlabel{background:rgba(13,15,17,.82);border:0;border-radius:5px;color:var(--ink);box-shadow:none;font:500 12px var(--body);padding:1px 6px;display:none}
+.leaflet-tooltip.pinlabel{background:rgba(10,28,22,.82);border:0;border-radius:5px;color:var(--ink);box-shadow:none;font:500 12px var(--body);padding:1px 6px;display:none}
 .leaflet-tooltip.pinlabel::before{display:none}
 .show-labels .leaflet-tooltip.pinlabel{display:block}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink);border-radius:8px}
 .leaflet-popup-content{margin:10px 12px;font:400 14px var(--body)}
 .leaflet-popup-content b{font-size:15px;display:block}
 .leaflet-top.leaflet-left{top:calc(env(safe-area-inset-top,0px) + 54px)}
-.leaflet-control-attribution{font-size:9px;background:rgba(13,15,17,.6)!important;color:var(--muted)!important}
+.leaflet-control-attribution{font-size:9px;background:rgba(10,28,22,.6)!important;color:var(--muted)!important}
 .leaflet-control-attribution a{color:var(--muted)}
 .overlay-map{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;max-width:none!important}
 
 /* sheet */
-#sheet{position:absolute;z-index:800;left:0;right:0;bottom:0;height:calc(100% - env(safe-area-inset-top,0px) - 56px);display:flex;flex-direction:column;background:var(--bg);border-radius:16px 16px 0 0;transform:translateY(var(--sheet-y,50%));transition:transform .24s cubic-bezier(.2,.8,.2,1);will-change:transform}
+#sheet{border-top:3px solid var(--ink);position:absolute;z-index:800;left:0;right:0;bottom:0;height:calc(100% - env(safe-area-inset-top,0px) - 56px);display:flex;flex-direction:column;background:var(--bg);border-radius:16px 16px 0 0;transform:translateY(var(--sheet-y,50%));transition:transform .24s cubic-bezier(.2,.8,.2,1);will-change:transform}
 #sheet.dragging{transition:none}
 .sheet-full #top{display:none}
 #grab{flex:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;border-bottom:1px solid var(--line)}
@@ -96,7 +97,7 @@ ul.signup b{display:block;font-weight:700}
 #handle span{display:block;width:36px;height:4px;margin:auto;border-radius:2px;background:var(--line)}
 nav{display:grid;grid-template-columns:repeat(4,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 nav button{all:unset;cursor:pointer;text-align:center;padding:7px 2px 11px;font-weight:500;font-size:15px;color:var(--muted)}
-nav button[aria-selected="true"]{color:var(--accent);font-weight:700}
+nav button[aria-selected="true"]{color:var(--accent);font-weight:700;box-shadow:inset 0 -3px 0 var(--speculum)}
 #body{flex:1;min-height:0;position:relative;padding-bottom:env(safe-area-inset-bottom,0px)}
 .view{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--bg)}
 #detail{z-index:5}
@@ -110,7 +111,7 @@ nav button[aria-selected="true"]{color:var(--accent);font-weight:700}
 .row .odds{font-weight:700;font-size:15px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .row .odds span{display:block;font-weight:400;font-size:11px;color:var(--muted)}
 .back{all:unset;cursor:pointer;font-weight:500;color:var(--accent)}
-.kicker{font-size:13px;font-weight:500;color:var(--muted)}
+.kicker{font-size:13px;font-weight:500;color:var(--chestnut)}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
 .btn{display:inline-block;text-decoration:none;font-weight:500;font-size:14px;padding:9px 12px;border-radius:8px;background:var(--raised);color:var(--ink);border:0;cursor:pointer}
 .btn.main,.btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
@@ -125,7 +126,7 @@ section{display:flex;flex-direction:column;gap:9px;min-width:0}
 .big{font-weight:800;font-stretch:125%;font-size:48px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
 .bars{display:flex;flex-direction:column;gap:6px}
 .bar{display:grid;grid-template-columns:44px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:13px;font-variant-numeric:tabular-nums}
-.bar i{display:block;height:10px;border-radius:3px;background:var(--accent);min-width:2px}
+.bar i{display:block;height:10px;border-radius:3px;background:var(--speculum);min-width:2px}
 .bar span:first-child{color:var(--muted)}
 .bar span:last-child{text-align:right}
 .sp{grid-template-columns:minmax(0,132px) minmax(0,1fr) 34px}
@@ -171,7 +172,7 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
 
 <div id="app">
   <div id="map" aria-label="Satellite map of California refuges"></div>
-  <div id="brand"><svg viewBox="0 0 48 48" role="img" aria-label="Refuge Rat logo"><path fill="#f2c230" d="M14 34C14 23 22 16 30 17c4 .4 7 3 9 6l6 5c1 1 .5 2.500-1 2.500H38c-3 3-8 4.500-13 4.500-6 0-11-.5-11-1z"/><circle cx="31" cy="15" r="5.500" fill="#f2c230"/><circle cx="31" cy="15" r="2.500" fill="#0d0f11"/><circle cx="38" cy="25" r="1.600" fill="#0d0f11"/><path d="M15 33C6 33 3 27 6 21S14 12 9 6" fill="none" stroke="#f2c230" stroke-width="3" stroke-linecap="round"/></svg><span>Refuge Rat</span></div>
+  <div id="brand"><svg viewBox="0 0 66 56" role="img" aria-label="Refuge Rat logo: a mallard drake with a rat tail"><path d="M15 39C7 40 3 33 7 27 9 24 8 20 4 19" fill="none" stroke="#e7a59a" stroke-width="2.600" stroke-linecap="round"/><path fill="#b9bfb6" d="M14 39C14 30 25 26 37 27 46 28 52 32 52 39 52 47 43 51 32 51 22 51 14 47 14 39Z"/><path fill="#7b4427" d="M41 28C48 29 53 33 53 39 53 45 48 49 42 50 45 43 45 35 41 28Z"/><path fill="#14704d" d="M41 23H51L52 31H42Z"/><circle cx="46" cy="17" r="10" fill="#14704d"/><path d="M41 31.500 53 30.500" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path fill="#efbe2f" d="M54 16 63 19C64 21 61 24 54 23Z"/><circle cx="48" cy="14" r="1.700" fill="#0a1c16"/><path fill="#3b78e6" stroke="#fff" stroke-width="1.500" d="M24 37 36 36 34 44 25 44Z"/></svg><span>Refuge Rat</span></div>
   <div id="top">
     <div id="shoot" aria-live="polite"></div>
     <div class="tools">
