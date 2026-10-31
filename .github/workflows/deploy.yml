@@ -31,7 +31,14 @@ jobs:
           git config user.name "refuge-draw-bot"
           git config user.email "refuge-draw-bot@users.noreply.github.com"
           git add data/snapshot.json data/history.json
-          git diff --cached --quiet || (git commit -m "Update CDFW data [skip ci]" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "Update CDFW data [skip ci]"
+            # Another publish can land during the build, so sync and retry before giving up.
+            for try in 1 2 3; do
+              git pull --rebase -X theirs origin main && git push && break
+              sleep 10
+            done
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
