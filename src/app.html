@@ -1,0 +1,742 @@
+<title>Refuge Draw</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Saira+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>/*LEAFLET_CSS*/</style>
+<style>
+/* Layout: full-bleed satellite map with a draggable pull-up sheet; the sheet becomes a side panel on wide screens.
+   Color: one committed dark look from a blind at first light. Tule olive, field tan, blaze orange for action. */
+:root{
+  color-scheme:dark;
+  --bg:#10140d;--surface:#1a2015;--raised:#262e1f;--line:#3b4530;--ink:#f0f1e4;--muted:#a9b198;
+  --blaze:#ff6a13;--blaze-ink:#180800;--tan:#cdb67f;--moss:#8fb04f;--red:#ef5a4a;--sky:#7fb4e8;--slate:#9aa0a6;
+  --accent:var(--blaze);--tint:#2d3524;--warn-bg:#3b2a0e;--warn:#f6cd80;
+  --brand:"Black Ops One","Impact",sans-serif;
+  --display:"Saira Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --topo:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='160' fill='none' stroke='%23cdb67f' stroke-opacity='.13'%3E%3Cpath d='M-10 40C40 10 90 70 150 40s110-30 180 5M-10 70c50-30 90 30 150 5s120-35 190 5M-10 100c60-30 100 25 160 5s110-30 180 0M-10 130c50-25 110 25 170 5s100-25 170 0M60 22c20-14 50-10 62 2 10 12-12 22-34 20-22-1-42-11-28-22z'/%3E%3C/svg%3E");
+}
+[hidden]{display:none!important}
+.sheet-full #tools{display:none}
+@media (min-width:860px){.sheet-full #tools{display:flex}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);overflow:hidden}
+#app{position:absolute;inset:0;overflow:hidden}
+#map{position:absolute;inset:0;z-index:0;background:#1d2a24}
+.leaflet-container{font-family:var(--body);background:#1d2a24}
+h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.08;margin:0;text-wrap:balance}
+h2{font-size:30px;letter-spacing:.01em;text-transform:uppercase}
+h3{font-size:20px;letter-spacing:.03em;text-transform:uppercase;color:var(--tan)}
+p{margin:0}
+a{color:var(--blaze)}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+
+/* map chrome */
+#brand{position:absolute;z-index:500;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));font:400 19px var(--brand);letter-spacing:.03em;color:var(--ink);background:rgba(16,20,13,.82);border:1px solid var(--line);border-radius:4px;padding:6px 10px;pointer-events:none}
+#brand i{font-style:normal;color:var(--blaze)}
+#tools{position:absolute;z-index:900;top:calc(env(safe-area-inset-top,0px) + 10px);right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.tool{all:unset;box-sizing:border-box;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;background:rgba(16,20,13,.88);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
+.tool[aria-expanded="true"]{background:var(--blaze);color:var(--blaze-ink);border-color:var(--blaze)}
+.tool svg{width:22px;height:22px}
+#layers{width:min(290px,calc(100vw - 24px));background:rgba(26,32,21,.97);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+#layers .kicker{margin-bottom:-4px}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;text-align:center;padding:8px;font:700 15px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--blaze);color:var(--blaze-ink)}
+.chk{display:flex;gap:8px;align-items:center;font-weight:500;margin:0;cursor:pointer}
+.chk input{accent-color:var(--blaze);width:18px;height:18px;margin:0;flex:none}
+input[type=range]{width:100%;accent-color:var(--blaze)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:2px solid}
+.lg-open{border-color:#8dff5a!important;background:rgba(141,255,90,.28)}
+.lg-closed{border-color:#ff4a3d!important;background:rgba(255,74,61,.38)}
+.lg-state{border-color:#ffb020!important}
+#note{position:absolute;z-index:500;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 62px);background:rgba(16,20,13,.92);border:1px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px;max-width:min(320px,calc(100vw - 110px))}
+.pin{width:16px;height:16px;transform:rotate(45deg);border:2px solid #fff;box-shadow:0 0 0 1px #000,0 1px 6px #000}
+.pin.sel{outline:3px solid var(--blaze);outline-offset:3px}
+.leaflet-tooltip.pinlabel{background:rgba(16,20,13,.88);border:0;color:var(--ink);box-shadow:none;font:700 13px var(--display);letter-spacing:.03em;padding:1px 6px;display:none}
+.leaflet-tooltip.pinlabel::before{display:none}
+.show-labels .leaflet-tooltip.pinlabel{display:block}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink)}
+.leaflet-popup-content{margin:10px 12px;font:400 14px var(--body)}
+.leaflet-popup-content b{font:700 17px var(--display);display:block}
+.leaflet-top.leaflet-left{top:calc(env(safe-area-inset-top,0px) + 52px)}
+.leaflet-control-attribution{font-size:9px;background:rgba(16,20,13,.7)!important;color:var(--muted)!important}
+.leaflet-control-attribution a{color:var(--muted)}
+.leaflet-control-zoom{display:none}
+.overlay-map{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;max-width:none!important;image-rendering:auto}
+
+/* pull-up sheet */
+#sheet{position:absolute;z-index:800;left:0;right:0;bottom:0;height:calc(100% - env(safe-area-inset-top,0px) - 56px);display:flex;flex-direction:column;background:var(--bg);border-radius:14px 14px 0 0;border-top:2px solid var(--blaze);box-shadow:0 -8px 28px rgba(0,0,0,.6);transform:translateY(var(--sheet-y,50%));transition:transform .26s cubic-bezier(.2,.8,.2,1);will-change:transform}
+#sheet.dragging{transition:none}
+#grab{flex:none;touch-action:none;cursor:grab;background:var(--topo) center/320px,var(--surface);border-radius:12px 12px 0 0;user-select:none;-webkit-user-select:none}
+#handle{width:100%;padding:9px 0 5px;display:block;background:none;border:0;cursor:grab}
+#handle span{display:block;width:46px;height:5px;margin:auto;border-radius:3px;background:repeating-linear-gradient(90deg,var(--tan) 0 6px,transparent 6px 8px)}
+nav{display:grid;grid-template-columns:repeat(3,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav button{all:unset;cursor:pointer;text-align:center;padding:6px 4px 10px;font:700 18px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:3px solid transparent}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blaze)}
+#body{flex:1;min-height:0;position:relative;padding-bottom:env(safe-area-inset-bottom,0px)}
+#detail{background:var(--bg);z-index:5}
+.view{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.pad{padding-block:14px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+#filters{display:flex;gap:6px;overflow-x:auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));scrollbar-width:none;position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line)}
+.chip{all:unset;cursor:pointer;flex:none;font-weight:600;font-size:13px;padding:6px 11px;border:1px solid var(--line);border-radius:4px;background:var(--surface);display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--blaze);color:var(--blaze-ink);border-color:var(--blaze)}
+.dot{width:10px;height:10px;transform:rotate(45deg);flex:none;display:inline-block}
+.d-night{background:var(--sky)}.d-morning{background:var(--moss)}.d-line{background:var(--tan)}.d-none,.d-call{background:var(--slate)}
+.chip[aria-pressed="true"] .dot{outline:1px solid var(--blaze-ink)}
+.rg{font:700 15px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--tan);padding-block:14px 6px;padding-left:max(16px,env(safe-area-inset-left,0px))}
+/* each refuge row is a paper hunt tag: punched hole, perforation, odds on the stub */
+.row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) 82px;align-items:stretch;margin:0 max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));width:calc(100% - 24px);background:var(--surface);border:1px solid var(--line);border-radius:6px;position:relative}
+.row:hover{background:var(--raised)}
+.row .hole{display:grid;place-items:center;padding-left:12px}
+.row .hole .dot{width:12px;height:12px}
+.row .txt{padding:10px 10px 10px 11px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.row b{font:700 18px/1.12 var(--display);letter-spacing:.02em}
+.row small{color:var(--muted);font-size:13px}
+.row .odds{border-left:2px dashed var(--line);display:flex;flex-direction:column;justify-content:center;align-items:center;font:700 20px/1 var(--display);padding:6px 2px;color:var(--ink)}
+.row .odds span{font:500 10px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.back{all:unset;cursor:pointer;font:700 16px var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--blaze)}
+.kicker{font:700 14px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--tan)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-block;text-decoration:none;font:700 15px var(--display);letter-spacing:.04em;text-transform:uppercase;padding:9px 12px;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.main,.btn[aria-pressed="true"]{background:var(--blaze);border-color:var(--blaze);color:var(--blaze-ink)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.stats div{background:var(--surface);padding:9px 10px;min-width:0}
+.stats b{display:block;font:700 25px/1.1 var(--display)}
+.stats span{font-size:12px;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:9px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 13px;min-width:0}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:9px 12px;font-size:14px;border-left:4px solid var(--blaze)}
+.quiet{color:var(--muted);font-size:13px;margin:0}
+ol.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ol.tl li{display:grid;grid-template-columns:82px minmax(0,1fr);gap:12px;padding-block:11px;border-top:1px solid var(--line)}
+ol.tl li:first-child{border-top:0}
+.when{font:700 18px/1.1 var(--display)}
+.when small{display:block;font:400 12px var(--body);color:var(--muted);margin-top:2px}
+li.past .when,li.past .what{opacity:.5}
+li.key .when{color:var(--blaze)}
+.what b{display:block;font-weight:600}
+.what{min-width:0;font-size:14px}
+input[type=date],input[type=text]{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink);width:100%;max-width:260px}
+input.mono{font-family:var(--mono);max-width:none}
+label{font-weight:600;font-size:14px;display:block;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th{font-size:12px;text-align:left;color:var(--muted);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{padding:6px;border-bottom:1px solid var(--line)}
+td.n,th.n{text-align:right}
+td.mono{font:500 13px var(--mono);white-space:nowrap}
+.scroll{overflow-x:auto}
+details{background:var(--surface);border:1px solid var(--line);border-radius:6px;min-width:0}
+summary{cursor:pointer;padding:11px 13px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-weight:600}
+summary span{font-weight:400;font-size:13px;color:var(--muted);white-space:nowrap}
+details .inner{padding:0 13px 12px;display:flex;flex-direction:column;gap:8px}
+.tag{font-size:12px;padding:2px 7px;border-radius:3px;background:var(--tint);color:var(--ink);font-weight:500}
+.tag.old{background:var(--warn-bg);color:var(--warn)}
+#hit{font-size:15px}
+#hit.ok{border:2px solid var(--blaze)}
+#hit b.entry{font:700 34px/1 var(--display);color:var(--blaze);text-transform:uppercase;display:block;margin-bottom:4px}
+ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px}
+ul.plain li::marker{color:var(--blaze)}
+@media (min-width:860px){
+  #sheet{top:0;bottom:0;left:0;right:auto;width:420px;height:100%;border-radius:0;border-top:0;border-right:2px solid var(--blaze);transform:none;transition:none}
+  #handle{display:none}
+  nav button{padding-top:12px}
+  #brand{left:436px}
+  #note{left:calc(50% + 210px)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div id="app">
+  <div id="map" aria-label="Satellite map of California refuges"></div>
+  <div id="brand">REFUGE<i>/</i>DRAW</div>
+  <div id="tools">
+    <button class="tool" id="layerbtn" aria-label="Map layers" aria-expanded="false" aria-controls="layers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 9l10 6 10-6-10-6z"/><path d="m2 15 10 6 10-6"/></svg></button>
+    <button class="tool" id="locate" aria-label="Show my location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/></svg></button>
+    <div id="layers" hidden>
+      <div class="kicker">Base map</div>
+      <div class="seg"><button id="base-sat" aria-pressed="true">Satellite</button><button id="base-topo" aria-pressed="false">Topo</button></div>
+      <label class="chk"><input type="checkbox" id="l-labels" checked>Roads and place names</label>
+      <div class="kicker">Hunt layers</div>
+      <label class="chk"><input type="checkbox" id="l-bounds" checked>Official boundaries</label>
+      <div class="legend"><span><i class="lg-open"></i>Hunt unit</span><span><i class="lg-closed"></i>Closed zone</span><span><i class="lg-state"></i>State area line</span></div>
+      <label class="chk"><input type="checkbox" id="l-overlay" checked>Hunt map overlay</label>
+      <div><label for="l-opacity">Overlay strength</label><input type="range" id="l-opacity" min="20" max="100" value="85"></div>
+      <p class="quiet" id="ov-name">Pick a refuge to lay its hunt map on the imagery.</p>
+    </div>
+  </div>
+  <div id="note" hidden role="status"></div>
+  <div id="sheet">
+    <div id="grab">
+      <button id="handle" aria-label="Resize panel"><span></span></button>
+      <nav role="tablist">
+        <button role="tab" data-tab="map" aria-selected="true">Refuges</button>
+        <button role="tab" data-tab="how" aria-selected="false">The Process</button>
+        <button role="tab" data-tab="draw" aria-selected="false">Draws</button>
+      </nav>
+    </div>
+    <div id="body">
+      <div class="view" id="mapview"><div id="filters"></div><div id="list"></div></div>
+      <div class="view" id="howview" hidden></div>
+      <div class="view" id="drawview" hidden></div>
+      <div class="view" id="detail" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const REFUGES = /*REFUGES*/null;
+let DATA = /*SNAPSHOT*/null;
+const OVERLAYS = /*OVERLAYS*/null;
+const LICENSE_URL = 'https://www.licenses.wildlife.ca.gov/internetsales';
+const INFO_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=70431&inline';
+const NEWS_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=70409&inline';
+const STATS_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=247439&inline';
+const CLOSURES_URL = 'https://wildlife.ca.gov/Closures';
+const AGENT_URL = 'https://www.ca.wildlifelicense.com/internetsales/OutletSearch/FindOutlet';
+const VAC = {
+  night:{label:'Lottery the night before',dot:'d-night'},
+  morning:{label:'Lottery the morning of',dot:'d-morning'},
+  line:{label:'First-come line',dot:'d-line'},
+  none:{label:'Reservation only',dot:'d-none'},
+  call:{label:'Type B, call the area',dot:'d-call'}
+};
+const SPECIES = {MALL:'Mallard',AGWT:'Green-winged teal',NOPI:'Pintail',NSHO:'Shoveler',AMWI:'Wigeon',GADW:'Gadwall',GWFG:'White-fronted goose',CITE:'Cinnamon teal',WODU:'Wood duck',SNGO:'Snow goose',RNDU:'Ring-necked duck',CANG:'Canada goose',BUFF:'Bufflehead',RUDU:'Ruddy duck',LESC:'Lesser scaup'};
+const CA_BOUNDS = [[32.4, -124.5], [42.1, -114.0]];
+/* Which official boundary each refuge fits to: [agency area, optional hunt unit]. */
+const FWS = n => n + ' National Wildlife Refuge';
+const AREA = {sacramento:[FWS('Sacramento')],delevan:[FWS('Delevan')],colusa:[FWS('Colusa')],sutter:[FWS('Sutter')],kern:[FWS('Kern')],
+  sanluis:[FWS('San Luis'),'San Luis Unit'],kesterson:[FWS('San Luis'),'Kesterson Unit'],freitasn:[FWS('San Luis'),'North Freitas Unit'],freitass:[FWS('San Luis'),'South Freitas Unit'],merced:[FWS('Merced')],
+  graylodge:['Gray Lodge Wildlife Area'],grizzly:['Grizzly Island Wildlife Area'],joice:['Grizzly Island Wildlife Area'],yolo:['Yolo Bypass Wildlife Area'],losbanos:['Los Banos Wildlife Area'],volta:['Volta Wildlife Area'],mendota:['Mendota Wildlife Area'],sanjacinto:['San Jacinto Wildlife Area'],ashcreek:['Ash Creek Wildlife Area'],buttevalley:['Butte Valley Wildlife Area'],shasta:['Shasta Valley Wildlife Area'],willow:['Willow Creek Wildlife Area']};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n).toLocaleString('en-US');
+const link = (url, text, cls) => `<a class="${cls || ''}" href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+
+/* ---------- dates ---------- */
+const DAY = 864e5;
+const pad2 = n => String(n).padStart(2, '0');
+const toISO = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const fromISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); };
+const fmt = (d, o) => d.toLocaleDateString('en-US', o || {weekday:'short', month:'short', day:'numeric'});
+const nextSaturday = () => { const t = today(); return addDays(t, ((6 - t.getDay() + 7) % 7) || 7); };
+function usDate(s){ const m = String(s || '').match(/(\d+)\/(\d+)\/(\d+)/); return m ? new Date(+m[3], m[1] - 1, +m[2]) : null; }
+
+/* NOAA sunrise approximation, returning a UTC ms timestamp for the given local date. */
+function sunriseUTC(date, lat, lng){
+  const rad = Math.PI / 180;
+  const start = Date.UTC(date.getFullYear(), 0, 0);
+  const n = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - start) / DAY);
+  const g = 2 * Math.PI / 365 * (n - 1 + 6 / 24 - 0.5);
+  const eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const ha = Math.acos(Math.cos(90.833 * rad) / (Math.cos(lat * rad) * Math.cos(dec)) - Math.tan(lat * rad) * Math.tan(dec)) / rad;
+  const mins = 720 - 4 * (lng + ha) - eq;
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + mins * 6e4;
+}
+const clock = ms => new Date(ms).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles'});
+const roundTo5 = ms => Math.round(ms / 3e5) * 3e5;
+
+/* ---------- data helpers ---------- */
+const drawsFor = r => (DATA.draws || []).filter(d => (r.drawKeys || []).includes(d.key));
+const isCurrent = d => { const h = usDate(d.huntDate); return h && (today() - h) / DAY <= 14; };
+function harvestFor(r){
+  const rows = ((DATA.harvest || {}).rows || []).filter(x => (r.harvest || []).includes(x.area) && x.hunters > 0);
+  const key = x => { const [m, d] = x.date.split('/').map(Number); return (m < 8 ? m + 12 : m) * 100 + d; };
+  return rows.sort((a, b) => key(b) - key(a));
+}
+function freshText(){
+  if (!DATA.fetchedAt) return '';
+  const when = new Date(DATA.fetchedAt).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+  return `CDFW data pulled ${when}`;
+}
+
+/* ---------- map ---------- */
+let map, markers = {}, selected = null, filter = 'all', boundsLayer = null, boundaryFeatures = [], activeOverlay = null, activeOverlayMeta = null, overlayOpacity = .85;
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const VAC_COLOR = {night:'#7fb4e8', morning:'#8fb04f', line:'#cdb67f', none:'#9aa0a6', call:'#9aa0a6'};
+function pinIcon(r, sel){
+  return L.divIcon({className:'', iconSize:[16, 16], iconAnchor:[8, 8], html:`<div class="pin${sel ? ' sel' : ''}" style="background:${VAC_COLOR[r.vacType]}"></div>`});
+}
+/* Lays a GPS-tagged map image on the map from three known corners, so slight rotation stays true. */
+const CornerOverlay = L.Layer.extend({
+  initialize(meta, opacity){ this.meta = meta; this.opacity = opacity; },
+  onAdd(m){
+    this._map = m;
+    const img = new Image();
+    img.onload = () => { if (this._map) this._draw(img); };
+    img.onerror = () => { flash('This hunt map image did not load.'); };
+    img.src = this.meta.img;
+    m.on('zoom viewreset zoomend moveend', this._place, this);
+  },
+  onRemove(m){ m.off('zoom viewreset zoomend moveend', this._place, this); if (this.el) this.el.remove(); this._map = null; },
+  _draw(img){
+    /* Paper white goes clear so the imagery shows through under the map's linework. */
+    let el = img;
+    try {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const x = c.getContext('2d', {willReadFrequently:true});
+      x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        const low = Math.min(p[i], p[i + 1], p[i + 2]);
+        if (low > 238) p[i + 3] = 0;
+        else if (low > 205) p[i + 3] = Math.round(p[i + 3] * (238 - low) / 33);
+      }
+      x.putImageData(d, 0, 0);
+      el = c;
+    } catch (e) {}
+    this.w = img.naturalWidth; this.h = img.naturalHeight;
+    el.className = 'overlay-map leaflet-zoom-hide';
+    const s = this.meta.clip;
+    el.style.clipPath = `inset(${s[0]}% ${s[1]}% ${s[2]}% ${s[3]}%)`;
+    el.style.opacity = this.opacity;
+    this.el = el;
+    this._map.getPane('overlayPane').prepend(el);
+    this._place();
+  },
+  _place(){
+    if (!this.el || !this._map) return;
+    const [tl, tr, bl] = this.meta.corners.map(c => this._map.latLngToLayerPoint(c));
+    const a = (tr.x - tl.x) / this.w, b = (tr.y - tl.y) / this.w, c = (bl.x - tl.x) / this.h, d = (bl.y - tl.y) / this.h;
+    this.el.style.transform = `matrix(${a},${b},${c},${d},${tl.x},${tl.y})`;
+  },
+  setOpacity(v){ this.opacity = v; if (this.el) this.el.style.opacity = v; }
+});
+function overlayBounds(o){
+  const [tl, tr, bl] = o.corners, br = [tr[0] + bl[0] - tl[0], tr[1] + bl[1] - tl[1]];
+  const lats = [tl[0], tr[0], bl[0], br[0]], lngs = [tl[1], tr[1], bl[1], br[1]];
+  const s = o.clip, h = Math.max(...lats) - Math.min(...lats), w = Math.max(...lngs) - Math.min(...lngs);
+  return L.latLngBounds([Math.min(...lats) + h * s[2] / 100, Math.min(...lngs) + w * s[3] / 100], [Math.max(...lats) - h * s[0] / 100, Math.max(...lngs) - w * s[1] / 100]);
+}
+const overlaysFor = id => (OVERLAYS || []).filter(o => o.refuge === id);
+function refugeBounds(id){
+  const spec = AREA[id];
+  if (spec && boundaryFeatures.length) {
+    const fs = boundaryFeatures.filter(f => f.properties.area === spec[0] && (!spec[1] || f.properties.unit === spec[1]));
+    if (fs.length) return L.geoJSON({type:'FeatureCollection', features:fs}).getBounds();
+  }
+  const ov = overlaysFor(id)[0];
+  return ov ? overlayBounds(ov) : null;
+}
+function initMap(){
+  if (typeof L === 'undefined') { $('#map').innerHTML = '<p class="pad">The map library did not load. The refuge list still works.</p>'; return; }
+  map = L.map('map', {zoomSnap:0.5, zoomControl:false, attributionControl:false, maxZoom:19, preferCanvas:false, scrollWheelZoom:true, touchZoom:true});
+  L.control.attribution({position:'topleft', prefix:false}).addTo(map);
+  const attr = 'Imagery &copy; Esri, Maxar, Earthstar Geographics';
+  baseLayers.sat = L.tileLayer(ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:19, attribution:attr});
+  baseLayers.topo = L.tileLayer(ESRI + 'World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'&copy; Esri'});
+  labelLayers = L.layerGroup([
+    L.tileLayer(ESRI + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, opacity:.75}),
+    L.tileLayer(ESRI + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18})
+  ]);
+  baseLayers.sat.addTo(map); labelLayers.addTo(map);
+  map.fitBounds(CA_BOUNDS, fitOpts());
+  REFUGES.forEach(r => {
+    const m = L.marker([r.lat, r.lng], {icon:pinIcon(r), title:r.name, alt:r.name, riseOnHover:true}).addTo(map);
+    m.bindTooltip(r.name.replace(/\s*\(.*\)/, ''), {permanent:true, direction:'right', offset:[10, 0], className:'pinlabel'});
+    m.on('click', () => { setTab('map'); openDetail(r.id); });
+    markers[r.id] = m;
+  });
+  const labels = () => $('#map').classList.toggle('show-labels', map.getZoom() >= 9);
+  map.on('zoomend', labels); labels();
+  new ResizeObserver(() => map.invalidateSize()).observe($('#map'));
+  fetch('boundaries.json').then(r => r.json()).then(g => {
+    boundaryFeatures = g.features;
+    boundsLayer = L.geoJSON(g, {
+      style: f => {
+        const s = f.properties.status;
+        if (s === 'closed') return {color:'#ff4a3d', weight:2, fillColor:'#ff4a3d', fillOpacity:.32};
+        if (s === 'open') return {color:'#8dff5a', weight:2, fillColor:'#8dff5a', fillOpacity:.14};
+        return {color:'#ffb020', weight:2.5, fill:false, dashArray:'6 5'};
+      },
+      onEachFeature: (f, l) => {
+        const p = f.properties, s = {closed:'Closed to hunting', open:'Hunt unit. Special regulations apply.', state:'Outer property line, not a hunt zone. Closed zones may sit inside it.'}[p.status];
+        l.bindPopup(`<b>${esc(p.unit)}</b>${esc(p.area)}<br>${esc(s)}<br><span class="quiet">Source: ${esc(p.src)}</span>`);
+      }
+    });
+    if ($('#l-bounds').checked) boundsLayer.addTo(map);
+    /* Boundaries are better than hand-placed pins, so move each pin to its unit's center. */
+    REFUGES.forEach(r => {
+      if (!AREA[r.id] || r.id === 'joice') return;
+      const b = refugeBounds(r.id);
+      if (b && b.isValid()) markers[r.id].setLatLng(b.getCenter());
+    });
+    Object.entries({howard:0, littledry:0, llano:0, saltslough:0, gadwall:0, china:0, dakin:0, fleming:0}).forEach(([id]) => {
+      const o = overlaysFor(id)[0]; if (o) markers[id].setLatLng(overlayBounds(o).getCenter());
+    });
+  }).catch(() => { flash('Official boundaries did not load.'); });
+}
+const baseLayers = {}; let labelLayers;
+function sheetCover(){ return innerWidth >= 860 ? 0 : Math.max(0, innerHeight - $('#sheet').getBoundingClientRect().top); }
+function fitOpts(){
+  const wide = innerWidth >= 860;
+  return wide ? {paddingTopLeft:[440, 30], paddingBottomRight:[30, 30]} : {paddingTopLeft:[16, 60], paddingBottomRight:[16, sheetCover() + 16]};
+}
+function setOverlay(meta){
+  if (activeOverlay) { map.removeLayer(activeOverlay); activeOverlay = null; }
+  activeOverlayMeta = meta;
+  $('#ov-name').textContent = meta ? `Showing: ${meta.label}` : 'No GPS-tagged hunt map is loaded. Open the PDF from a refuge to read it.';
+  if (meta && map && $('#l-overlay').checked) { activeOverlay = new CornerOverlay(meta, overlayOpacity); activeOverlay.addTo(map); }
+  document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!meta && b.dataset.ov === meta.img));
+}
+function focusRefuge(r){
+  if (!map) return;
+  const ovs = overlaysFor(r.id);
+  setOverlay(ovs[0] || null);
+  const b = refugeBounds(r.id);
+  setSheet('half');
+  setTimeout(() => {
+    if (b && b.isValid()) map.fitBounds(b, Object.assign(fitOpts(), {maxZoom:15}));
+    else map.setView(markers[r.id].getLatLng(), 12);
+  }, 280);
+}
+function applyFilter(){
+  REFUGES.forEach(r => {
+    const m = markers[r.id]; if (!m || !map) return;
+    const show = filter === 'all' || r.vacType === filter;
+    if (show) m.addTo(map); else m.remove();
+  });
+}
+let noteTimer;
+function flash(t){ const n = $('#note'); n.textContent = t; n.hidden = false; clearTimeout(noteTimer); noteTimer = setTimeout(() => { n.hidden = true; }, 5000); }
+
+/* ---------- pull-up sheet ---------- */
+const SNAP = {peek:.82, half:.5, full:0};
+let sheetState = 'half';
+function setSheet(s){
+  sheetState = s;
+  document.body.classList.toggle('sheet-full', s === 'full');
+  document.documentElement.style.setProperty('--sheet-y', sheetOffset(s) + 'px');
+}
+function sheetOffset(s){
+  const h = $('#sheet').offsetHeight;
+  return s === 'peek' ? Math.max(0, h - 118) : Math.round(h * SNAP[s]);
+}
+function initSheet(){
+  const sheet = $('#sheet'), grab = $('#grab');
+  setSheet('half');
+  let startY = 0, startOff = 0, drag = false, moved = 0;
+  grab.addEventListener('pointerdown', e => {
+    if (innerWidth >= 860) return;
+    drag = true; moved = 0; startY = e.clientY; startOff = sheetOffset(sheetState);
+    grab.setPointerCapture(e.pointerId); sheet.classList.add('dragging');
+  });
+  grab.addEventListener('pointermove', e => {
+    if (!drag) return;
+    moved = Math.max(moved, Math.abs(e.clientY - startY));
+    const y = Math.min(sheetOffset('peek'), Math.max(0, startOff + e.clientY - startY));
+    document.documentElement.style.setProperty('--sheet-y', y + 'px');
+  });
+  const end = e => {
+    if (!drag) return;
+    drag = false; sheet.classList.remove('dragging');
+    if (moved < 6) {
+      /* A tap on a tab or the handle: open the sheet up if it is resting low. */
+      const tab = document.elementFromPoint(e.clientX, e.clientY);
+      if (tab && tab.closest('nav button')) { setTab(tab.closest('nav button').dataset.tab); if (sheetState === 'peek') setSheet('half'); }
+      else setSheet(sheetState === 'peek' ? 'half' : sheetState === 'half' ? 'full' : 'peek');
+      return;
+    }
+    const y = startOff + e.clientY - startY;
+    const best = Object.keys(SNAP).sort((a, b) => Math.abs(sheetOffset(a) - y) - Math.abs(sheetOffset(b) - y))[0];
+    setSheet(best);
+    if (map) setTimeout(() => map.invalidateSize(), 280);
+  };
+  grab.addEventListener('pointerup', end);
+  grab.addEventListener('pointercancel', end);
+  addEventListener('resize', () => setSheet(sheetState));
+}
+function initControls(){
+  $('#layerbtn').onclick = () => { const p = $('#layers'); p.hidden = !p.hidden; $('#layerbtn').setAttribute('aria-expanded', !p.hidden); };
+  const base = k => {
+    if (!map) return;
+    Object.entries(baseLayers).forEach(([n, l]) => { if (n === k) l.addTo(map); else map.removeLayer(l); });
+    baseLayers[k].bringToBack();
+    $('#base-sat').setAttribute('aria-pressed', k === 'sat'); $('#base-topo').setAttribute('aria-pressed', k === 'topo');
+  };
+  $('#base-sat').onclick = () => base('sat');
+  $('#base-topo').onclick = () => base('topo');
+  $('#l-labels').onchange = e => { if (map) { if (e.target.checked) labelLayers.addTo(map); else map.removeLayer(labelLayers); } };
+  $('#l-bounds').onchange = e => { if (map && boundsLayer) { if (e.target.checked) boundsLayer.addTo(map); else map.removeLayer(boundsLayer); } };
+  $('#l-overlay').onchange = () => setOverlay(activeOverlayMeta);
+  $('#l-opacity').oninput = e => { overlayOpacity = e.target.value / 100; if (activeOverlay) activeOverlay.setOpacity(overlayOpacity); };
+  let me;
+  $('#locate').onclick = () => {
+    if (!navigator.geolocation || !isSecureContext) { flash('Location needs a secure (https) site. It will work once this is hosted.'); return; }
+    navigator.geolocation.getCurrentPosition(p => {
+      const ll = [p.coords.latitude, p.coords.longitude];
+      if (me) me.setLatLng(ll); else me = L.circleMarker(ll, {radius:8, color:'#fff', weight:3, fillColor:'#ff6a13', fillOpacity:1}).addTo(map);
+      map.setView(ll, 13);
+    }, () => flash('Could not get your location. Check the browser location permission.'));
+  };
+}
+
+/* ---------- list ---------- */
+function renderFilters(){
+  const opts = [['all', 'All'], ['night', 'Night-before lottery'], ['morning', 'Morning lottery'], ['line', 'First-come line']];
+  $('#filters').innerHTML = opts.map(([k, l]) => `<button class="chip" aria-pressed="${filter === k}" data-f="${k}">${k === 'all' ? '' : `<i class="dot ${VAC[k].dot}"></i>`}${l}</button>`).join('');
+}
+function renderList(){
+  const groups = {};
+  REFUGES.filter(r => filter === 'all' || r.vacType === filter).forEach(r => (groups[r.region] = groups[r.region] || []).push(r));
+  $('#list').innerHTML = Object.keys(groups).map(g => `<div class="rg">${esc(g)}</div>` + groups[g].map(r => `
+    <button class="row" data-id="${r.id}">
+      <span class="hole"><i class="dot ${VAC[r.vacType].dot}"></i></span>
+      <span class="txt"><b>${esc(r.name)}</b><small>${esc(VAC[r.vacType].label)}</small></span>
+      <span class="odds">1 in ${r.odds.one < 10 ? r.odds.one : Math.round(r.odds.one)}<span>Draw odds</span></span>
+    </button>`).join('')).join('');
+}
+
+/* ---------- refuge detail ---------- */
+let huntISO = toISO(nextSaturday());
+function timeline(r, hunt){
+  const t = today();
+  const steps = [];
+  const deadline = addDays(hunt, -17), passBy = addDays(hunt, -15), results = addDays(hunt, -7), eve = addDays(hunt, -1);
+  const deadlinePast = deadline < t;
+  steps.push({d:deadline, key:!deadlinePast, title:deadlinePast ? 'Reservation drawing closed for this date' : 'Last day to apply for a reservation',
+    body:`Applications close at 11:59 PM, 17 days before the hunt. Each hunt choice costs $1.34 and is non-refundable. You can apply online or at a license agent.`});
+  steps.push({d:passBy, title:'Last safe day to order a pass online',
+    body: r.kind === 'B' ? 'Type B areas need a Type A or Type B Season Pass. One-day and two-day passes are not accepted. Online passes are mailed and take up to 15 days, so buy from a license agent after this date.' : 'Type A areas take a One-Day, Two-Day or Season Pass. Online passes are mailed and take up to 15 days, so buy from a license agent after this date. Check stations do not sell passes.'});
+  steps.push({d:results, title:'Reservation results are out by now',
+    body:'CDFW posts results at least 7 days before the hunt, and sends email and a letter if you are drawn. Results are in your CDFW account.'});
+  let eveBody = 'Check every hunter has their license, photo ID, pass, HIP validation, duck validation and federal duck stamp. Check the closures page and call the area if the weather turned.';
+  if (r.vacType === 'night') {
+    steps.push({d:eve, key:true, title:'Enter the lottery', body:`${r.vacancy} Only one person from your party has to be there, and they need a valid GO ID and hunting license. You can enter only one lottery per hunt day.`});
+    steps.push({d:eve, title:'Pack and verify', body:eveBody});
+  } else {
+    steps.push({d:eve, title:'Pack and verify', body:eveBody});
+  }
+  let sr = null;
+  try { sr = sunriseUTC(hunt, r.lat, r.lng); } catch (e) {}
+  const shoot = sr ? roundTo5(sr - 30 * 6e4) : null;
+  const estIn = r.checkinH && shoot ? clock(shoot - r.checkinH * 36e5) : null;
+  const clockText = r.checkinAt || (estIn ? `about ${estIn}` : '');
+  const morning = [];
+  if (r.checkin) morning.push(`<b>Reservation check-in:</b> ${esc(r.checkin)}${estIn ? ` (about ${esc(estIn)})` : ''}.`);
+  if (r.expires) morning.push(`<b>Reservations expire:</b> ${esc(r.expires)}.`);
+  if (r.vacType === 'morning') morning.push(`<b>No reservation?</b> ${esc(r.vacancy)}`);
+  if (r.vacType === 'line') morning.push(`<b>No reservation?</b> Join the first-come, first-served line. Arrive early, since reservations go first and spots left over are filled from the line.`);
+  if (r.vacType === 'night') morning.push(`<b>Lottery drawn?</b> Check your ticket in Draw results, then check in when your number is called, after reservations.`);
+  if (r.vacType === 'none') morning.push(`<b>No reservation?</b> ${esc(r.vacancy)}`);
+  if (r.vacType === 'call') morning.push(`CDFW's check-in table covers Type A areas only, so call ${esc(r.phone)} for this area's times and any walk-in process.`);
+  if (shoot) morning.push(`<b>Estimated shoot time:</b> about ${esc(clock(shoot))}, which is half an hour before sunrise. Use the official table in the regulations.`);
+  steps.push({d:hunt, key:true, sub:clockText, title:'Hunt morning', html:morning.join('<br>')});
+  return steps.map(s => {
+    const past = s.d < t && +s.d !== +hunt;
+    return `<li class="${past ? 'past' : ''} ${s.key && !past ? 'key' : ''}">
+      <div class="when">${esc(fmt(s.d, {month:'short', day:'numeric'}))}<small>${esc(fmt(s.d, {weekday:'long'}))}${s.sub ? '<br>' + esc(s.sub) : ''}</small></div>
+      <div class="what"><b>${esc(s.title)}</b>${s.html || esc(s.body)}</div></li>`;
+  }).join('');
+}
+function drawBlock(r){
+  const list = drawsFor(r);
+  if (r.vacType === 'line') return `<p class="quiet">This area uses a first-come line, so there is no draw list.</p>`;
+  if (r.vacType === 'none') return `<p class="quiet">This area has no vacancy draw.</p>`;
+  if (r.vacType === 'call') return `<p class="quiet">No online draw list is published for this area.</p>`;
+  if (!list.length) return `<p class="quiet">${r.drawPage ? `CDFW's ${link(r.drawPage, 'vacancy draw page')} has no list posted for this refuge right now.` : 'No list for this refuge turned up online. The check station has the results, and the CDFW License App shows your own.'}</p>`;
+  return list.map(drawCard).join('');
+}
+function drawCard(d, i){
+  const cur = isCurrent(d);
+  const hunt = usDate(d.huntDate);
+  const rows = (d.entries || []).map(e => `<tr><td class="n">${e[1]}</td><td class="mono">${esc(e[0])}</td><td class="n">${e[2]}</td></tr>`).join('');
+  return `<details>
+    <summary><div>${esc(d.area || d.key)}${/ADA/.test(d.key) ? " (ADA blinds)" : ""} <span class="tag ${cur ? '' : 'old'}">${hunt ? esc(fmt(hunt, {month:'short', day:'numeric', year:cur ? undefined : 'numeric'})) : 'date unknown'}${cur ? '' : ' · older list'}</span></div><span>${(d.entries || []).length} tickets</span></summary>
+    <div class="inner">
+      ${rows ? `<div class="scroll"><table><thead><tr><th class="n">Entry order</th><th>Ticket</th><th class="n">Party</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="quiet">No tickets could be read from this PDF, so open the official copy.</p>'}
+      <p class="quiet">${link(d.url, 'Official PDF')} · Draw completed ${esc(d.drawDate || 'unknown')}</p>
+    </div></details>`;
+}
+function openDetail(id, keepScroll){
+  const r = REFUGES.find(x => x.id === id); if (!r) return;
+  selected = id;
+  Object.keys(markers).forEach(k => { const x = REFUGES.find(z => z.id === k); markers[k].setIcon(pinIcon(x, k === id)); });
+  const hunt = fromISO(huntISO);
+  const h = harvestFor(r).slice(0, 3);
+  const huntMaps = r.maps.filter(m => m.hunt), otherMaps = r.maps.filter(m => !m.hunt);
+  const ovs = overlaysFor(id);
+  const el = $('#detail');
+  const scroll = el.scrollTop;
+  el.innerHTML = `<div class="pad">
+    <button class="back" id="back">← All refuges</button>
+    <div><div class="kicker">${esc(r.region)} · Type ${r.kind} area</div><h2>${esc(r.name)}</h2></div>
+    ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><p class="quiet">Placed from the GPS data inside the official PDF. Tap Layers to change its strength.</p></section>` : `<div class="warn">This hunt map has no GPS data, so it can't be laid on the imagery. ${AREA[r.id] ? 'The official boundary is drawn instead. Open' : 'Open'} the PDF for the zones.</div>`}
+    <div class="kicker">Official PDFs</div>
+    <div class="btns">
+      ${huntMaps.map((m, i) => link(m.url, m.label, i === 0 ? 'btn main' : 'btn')).join('')}
+      ${otherMaps.map((m, i) => link(m.url, m.label, !huntMaps.length && i === 0 ? 'btn main' : 'btn')).join('')}
+      ${link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(r.name.replace(/\s*\(.*\)/, '') + ' California'), 'Directions', 'btn')}
+    </div>
+    ${!huntMaps.length ? `<p class="quiet">We could not find a dedicated waterfowl hunt map online for this unit, so this is the general area map. Ask the area for the hunt zones.</p>` : ''}
+    ${r.note ? `<div class="warn">${esc(r.note)}</div>` : ''}
+    <div class="stats">
+      <div><b>1 in ${r.odds.one}</b><span>Reservation odds</span></div>
+      <div><b>${num(r.odds.apps)}</b><span>Applications</span></div>
+      <div><b>${num(r.odds.res)}</b><span>Reservations</span></div>
+    </div>
+    <p class="quiet">2025-26 regular season, all hunt days combined. CDFW says Saturdays are harder to draw, and Wednesdays and Sundays easier.</p>
+    <section>
+      <h3>Your hunt timeline</h3>
+      <div><label for="huntdate">Hunt date</label><input type="date" id="huntdate" value="${huntISO}"></div>
+      <div class="card"><ol class="tl">${timeline(r, hunt)}</ol></div>
+      <p class="quiet">Check-in clock times are our estimates from sunrise. Confirm hunt days and times with the area at ${esc(r.phone)}.</p>
+    </section>
+    ${r.party ? `<section><h3>Party size</h3><p>${esc(r.party)}</p></section>` : ''}
+    <section><h3>Latest lottery list</h3>${drawBlock(r)}</section>
+    <section><h3>Recent hunt results</h3>
+      ${h.length ? `<div class="card scroll"><table><thead><tr><th>Date</th><th class="n">Hunters</th><th class="n">Birds</th><th class="n">Per hunter</th><th>Top species</th></tr></thead><tbody>
+        ${h.map(x => `<tr><td>${esc(x.date)}</td><td class="n">${x.hunters}</td><td class="n">${x.birds}</td><td class="n">${x.avg == null ? '–' : x.avg.toFixed(1)}</td><td>${esc((x.top || []).map(s => SPECIES[s] || s).filter((v, i, a) => a.indexOf(v) === i).join(', '))}</td></tr>`).join('')}
+      </tbody></table></div>` : `<p class="quiet">No hunts reported for this unit in the files we pulled.</p>`}
+    </section>
+    <section><h3>Contact and sources</h3>
+      <p>Phone: <span style="user-select:all">${esc(r.phone)}</span></p>
+      <div class="btns">${link(r.page, 'Area page', 'btn')}${link(CLOSURES_URL, 'Closures', 'btn')}${link(INFO_URL, 'Reservation table', 'btn')}</div>
+    </section>
+  </div>`;
+  el.hidden = false;
+  el.scrollTop = keepScroll ? scroll : 0;
+  $('#back').onclick = closeDetail;
+  el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
+  document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
+  if (!keepScroll) focusRefuge(r);
+  $('#huntdate').onchange = e => { if (e.target.value) { huntISO = e.target.value; openDetail(id, true); } };
+}
+function closeDetail(){
+  $('#detail').hidden = true; selected = null;
+  Object.keys(markers).forEach(k => markers[k].setIcon(pinIcon(REFUGES.find(z => z.id === k))));
+  if (map) setOverlay(null);
+  $('#ov-name').textContent = 'Pick a refuge to lay its hunt map on the imagery.';
+}
+
+/* ---------- how it works ---------- */
+function renderHow(){
+  $('#howview').innerHTML = `<div class="pad">
+    <div><div class="kicker">2026-27 season</div><h2>Two ways onto a refuge</h2></div>
+    <p>You can draw a reservation weeks ahead, or show up and try for a leftover spot.</p>
+    <section><h3>Reservation drawing</h3><div class="card"><ol class="tl">
+      <li><div class="when">Sep 1<small>Opens</small></div><div class="what"><b>Applications open</b>Apply in your CDFW account or at a license agent. Use season-long to enter every hunt date, or multiple-choice to pick dates.</div></li>
+      <li><div class="when">17 days<small>before hunt</small></div><div class="what"><b>Deadline</b>11:59 PM. Each choice costs $1.34. A duplicate choice is disqualified, and fees are not refunded if the area closes.</div></li>
+      <li><div class="when">7 days<small>before hunt</small></div><div class="what"><b>Results</b>Posted at least 7 days ahead. Drawn hunters get an email and a letter.</div></li>
+    </ol></div>
+    <div class="btns">${link(LICENSE_URL, 'Apply in your CDFW account', 'btn main')}${link(AGENT_URL, 'Find a license agent', 'btn')}</div></section>
+    <section><h3>In-person vacancy draw</h3><ul class="plain">
+      <li>Spots left after reservations go to a lottery or first-come line, depending on the refuge. The map is color coded by which one.</li>
+      <li>Most lotteries take sign-ups the night before, usually 6:00 to 8:00 or 9:00 PM.</li>
+      <li>Only one person from your party needs to enter, and they need a valid GO ID and hunting license.</li>
+      <li>You can enter only one lottery per hunt day.</li>
+      <li>On hunt morning, reservations check in first, then lottery entries in draw order, then any first-come line.</li>
+    </ul></section>
+    <section><h3>What everyone needs</h3><ul class="plain">
+      <li>California hunting license</li>
+      <li>Photo ID (junior hunters exempt)</li>
+      <li>Prepaid wildlife area pass (junior hunters exempt)</li>
+      <li>HIP validation</li>
+      <li>California duck validation (junior hunters exempt)</li>
+      <li>Federal duck stamp, age 16 and up</li>
+    </ul><div class="warn">Check stations do not sell licenses, passes or validations. Buy them before you drive out.</div></section>
+    <section><h3>Passes</h3><div class="card scroll"><table><thead><tr><th>Pass</th><th>Good for</th></tr></thead><tbody>
+      <tr><td>Type A One-Day</td><td>One day on a Type A area</td></tr>
+      <tr><td>Type A Two-Day</td><td>Two days, or two people for one day, on Type A areas</td></tr>
+      <tr><td>Type A Season</td><td>All Type A and B areas</td></tr>
+      <tr><td>Type B Season</td><td>Type B areas only</td></tr>
+    </tbody></table></div></section>
+    <section><h3>Special hunts</h3><div class="card scroll"><table><thead><tr><th>Dates</th><th>Hunt</th></tr></thead><tbody>
+      <tr><td>Nov 21, 2026</td><td>Free Hunting Day (registration required), also Apr 10, 2027</td></tr>
+      <tr><td>Dec 12, 2026</td><td>Delevan NWR junior hunt, postcard to USFWS</td></tr>
+      <tr><td>Dec 19, 2026</td><td>Sacramento NWR junior hunt, postcard to USFWS</td></tr>
+      <tr><td>Jan 2, 2027</td><td>Colusa NWR disabled veteran hunt</td></tr>
+      <tr><td>Jan 16–17, 2027</td><td>Veterans and military, Northeastern Zone</td></tr>
+      <tr><td>Feb 6–7, 2027</td><td>Veterans and military, Balance of State and southern zones</td></tr>
+      <tr><td>Feb 13–14, 2027</td><td>Youth hunting days, age 17 and under</td></tr>
+    </tbody></table></div></section>
+    <div class="warn">Bird flu (H5N1) is circulating. Wear gloves when cleaning birds, cook game to 165°F and do not feed dogs raw waterfowl.</div>
+    <section><h3>Official sources</h3><div class="btns">${link(NEWS_URL, '2026 newsletter', 'btn')}${link(INFO_URL, 'Reservation table', 'btn')}${link(STATS_URL, 'Drawing statistics', 'btn')}</div>
+    <p class="quiet">Refuge Draw is an unofficial prototype. It is not made by or affiliated with CDFW or USFWS. Rules change during the season, so confirm with the area before you go.</p></section>
+  </div>`;
+}
+
+/* ---------- draw results ---------- */
+function renderDraws(){
+  const all = DATA.draws || [];
+  const current = all.filter(isCurrent), older = all.filter(d => !isCurrent(d));
+  const h = (DATA.harvest || {}).files || [];
+  const prior = $('#ticket') ? $('#ticket').value : '';
+  $('#drawview').innerHTML = `<div class="pad">
+    <div><div class="kicker">In-person vacancy draws</div><h2>Find your ticket</h2><p class="quiet">${esc(freshText())}</p></div>
+    <form id="tform"><label for="ticket">Ticket number</label><input class="mono" type="text" id="ticket" inputmode="numeric" autocomplete="off" placeholder="VDR-0000014833" value="${esc(prior)}"></form>
+    <div id="hit" class="card" hidden aria-live="polite"></div>
+    <section><h3>Latest lists</h3>
+      ${current.length ? current.map(drawCard).join('') : `<p class="quiet">No lists from the past two weeks are posted right now.</p>`}
+    </section>
+    ${older.length ? `<section><h3>Older lists still posted</h3>${older.map(drawCard).join('')}</section>` : ''}
+    <section><h3>Your reservation draw</h3>
+      <p>Reservation results are private to your CDFW account, so this page can't show them. Sign in on the CDFW site to see yours.</p>
+      <div class="btns">${link(LICENSE_URL, 'Open my CDFW account', 'btn main')}</div>
+    </section>
+    <section><h3>Hunt results files</h3>
+      ${h.length ? `<div class="btns">${h.map(f => link(f.url, f.label.replace(/\(PDF\)/i, '').trim(), 'btn')).join('')}</div>` : `<p class="quiet">We could not load the hunt results list from CDFW.</p>`}
+    </section>
+    <p class="quiet">Lists show ticket numbers only. Not every refuge posts a list online. Check the official PDF or the check station before you rely on a result.</p>
+    ${(DATA.errors || []).length ? `<p class="quiet">${DATA.errors.length} CDFW file(s) could not be read on the last pull.</p>` : ''}
+  </div>`;
+  const input = $('#ticket');
+  const run = () => findTicket(input.value);
+  input.oninput = run;
+  $('#tform').onsubmit = e => { e.preventDefault(); run(); };
+  if (prior) run();
+}
+function findTicket(raw){
+  const box = $('#hit');
+  const q = raw.replace(/\D/g, '').replace(/^0+/, '');
+  if (q.length < 3) { box.hidden = true; return; }
+  const hits = [];
+  (DATA.draws || []).forEach(d => (d.entries || []).forEach(e => { if (e[0].replace(/\D/g, '').replace(/^0+/, '') === q) hits.push({d, e}); }));
+  box.hidden = false;
+  box.className = hits.length ? 'card ok' : 'card';
+  box.innerHTML = hits.length
+    ? hits.map(({d, e}) => {
+        const hunt = usDate(d.huntDate);
+        return `<b class="entry">Entry #${e[1]}</b><p>${esc(d.area || d.key)}, hunt date ${hunt ? esc(fmt(hunt)) : 'unknown'}. Party of ${e[2]}, out of ${(d.entries || []).length} tickets. A low number is called first, and a spot depends on how many remain. ${link(d.url, 'Official PDF')}</p>`;
+      }).join('')
+    : `No match in the lists we have. Check the number, or look at the check station, since some refuges do not post online.`;
+}
+
+/* ---------- shell ---------- */
+function setTab(t){
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  $('#mapview').hidden = t !== 'map';
+  $('#howview').hidden = t !== 'how';
+  $('#drawview').hidden = t !== 'draw';
+  $('#detail').hidden = true;
+  if (t === 'map' && selected) { $('#mapview').hidden = true; $('#detail').hidden = false; }
+}
+function renderAll(){
+  renderDraws();
+  if (selected) openDetail(selected, true);
+}
+document.addEventListener('click', e => {
+  const tab = e.target.closest('nav button'); if (tab) { setTab(tab.dataset.tab); return; }
+  const row = e.target.closest('.row'); if (row) { openDetail(row.dataset.id); return; }
+  const chip = e.target.closest('.chip');
+  if (chip) { filter = chip.dataset.f; renderFilters(); renderList(); applyFilter(); }
+});
+
+initSheet(); initControls(); renderFilters(); renderList(); renderHow(); renderAll(); initMap();
+
+/* On a server, swap in live data. As a static page this request fails and the built-in copy stays. */
+if (location.protocol.startsWith('http')) {
+  fetch('/api/live', {cache:'no-store'}).then(r => {
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) throw 0;
+    return r.json();
+  }).then(d => { if (d && d.draws && d.draws.length) { DATA = d; renderAll(); } }).catch(() => {});
+}
+</script>

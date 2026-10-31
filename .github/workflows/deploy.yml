@@ -1,0 +1,39 @@
+name: Refresh data and publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Pull CDFW data and build the site
+        run: ruby build.rb
+      - name: Save the latest data
+        run: |
+          git config user.name "refuge-draw-bot"
+          git config user.email "refuge-draw-bot@users.noreply.github.com"
+          git add data/snapshot.json
+          git diff --cached --quiet || (git commit -m "Update CDFW data [skip ci]" && git push)
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
