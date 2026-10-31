@@ -49,7 +49,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
 .chk input{accent-color:var(--accent);width:18px;height:18px;margin:0;flex:none}
 input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #note{position:absolute;z-index:500;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 110px);background:var(--surface);border-radius:8px;padding:7px 11px;font-size:13px;width:max-content;max-width:calc(100vw - 32px)}
-#legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:3px 10px;background:rgba(13,15,17,.86);border-radius:8px;padding:5px 9px;font-size:11px;pointer-events:none}
+#legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:3px 10px;background:rgba(13,15,17,.86);border-radius:8px;padding:5px 9px;font-size:11px;max-height:40vh;overflow-y:auto}
 #legend div{display:flex;align-items:center;gap:4px;white-space:nowrap}
 .sheet-full #legend{display:none}
 .fac{display:block;box-sizing:border-box}
@@ -64,6 +64,8 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #viewer{position:absolute;inset:0;z-index:2000;background:var(--bg);overflow:auto;-webkit-overflow-scrolling:touch}
 #viewer img{display:block;width:100%;min-width:640px;max-width:none;background:#fff}
 #viewer button{position:sticky;top:10px;left:10px;margin:10px;z-index:1}
+.sk{display:inline-block;width:14px;height:12px;border-radius:2px;flex:none}
+.sk.sym{width:14px;height:14px;background:#f2f1ea;color:#111;font:700 10px/14px var(--body);text-align:center;font-style:normal}
 .wp{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
 .pinrow{display:block}
 .daycards{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
@@ -445,6 +447,7 @@ function initMap(){
   });
   const labels = () => $('#map').classList.toggle('show-labels', map.getZoom() >= 9);
   map.on('zoomend', labels); labels();
+  map.on('click', e => { if (selected && !insideRefuge(selected, e.latlng)) { closeDetail(); setTab('map'); } });
   map.on('moveend', updateShoot); updateShoot();
   setInterval(updateShoot, 60000);
   new ResizeObserver(() => map.invalidateSize()).observe($('#map'));
@@ -485,6 +488,50 @@ const boundaryStyle = f => {
   if (!k) return {color:'#ffffff', weight:1.5, opacity:.8, fill:false};
   return {color:k.color, weight:2, fillColor:k.color, fillOpacity:f.properties.kind === 'closed' ? .3 : .18};
 };
+/* Each state hunt map's own legend, read from the official PDF so the key matches what is drawn. */
+const TAN = '#c9a66b', K = {
+  closedRed:['hatch', '#d6321f', 'Closed zone'], freeRoam:['hatch', '#222', 'Free roam', TAN], special:['fill', '#7fae6e', 'Special hunt area'], upland:['dots', '#3c8a3c', 'Upland game only', '#d9f0b8'],
+  assigned:['sym', '⬟', 'Assigned blind (must hunt from blind)'], lots:['sym', 'P', 'Parking lots'], miPark:['sym', '♿', 'Mobility-impaired parking and blinds'], check:['sym', '⚑', 'Check station']
+};
+const unitKey = name => [K.freeRoam, K.special, ['fill', TAN, `${name}, numbered fields are assigned`], K.upland, K.closedRed, K.assigned, K.lots, K.miPark, K.check];
+const STATE_KEY = {
+  map87799:[['hatch', '#222', 'Closed zone'], ['stripe', '#222', 'Retrieval zone'], ['cross', '#222', 'Mobility-impaired blind area'], ['sym', '■', 'Mobility-impaired blinds'], ['sym', '◉', 'Mobility-impaired parking'], ['sym', '●', 'Parking lots'], ['line', '#333', 'Public vehicle access'], ['dots', '#3a7fc1', 'Permanent ponds', '#bfe0f5'], ['fill', '#8a8a8a', 'Check station']],
+  map87821:unitKey('Howard Slough Unit'), map87832:unitKey('Little Dry Creek Unit'), map87833:unitKey('Llano Seco Unit'),
+  map87822:[['fill', TAN, 'Howard Slough Unit'], ['sym', '▲', 'Junior hunting blind'], K.closedRed, K.lots],
+  map110222:[['line', '#e8dc2a', 'Open to hunting'], ['cross', '#222', 'Closed to all uses'], ['hatch', '#222', 'Closed to hunting, other uses allowed'], ['sym', '★', 'Check station'], ['sym', 'A', 'Auto tour parking lots (A–D)'], ['sym', 'E', 'Hunt zone parking lots (E–M)'], ['sym', '⬟', 'Assigned blinds'], ['fill', '#2e5d94', 'Permanent pond'], ['fill', '#93b583', 'Agriculture'], ['fill', '#8ea3ad', 'Seasonal wetland'], ['fill', '#c9b48f', 'Upland']],
+  map91580:[['line', '#e8dc2a', 'Northeast Unit boundary'], ['line', '#8a2be2', 'Assigned pond'], ['sym', '⬟', 'Assigned hunting blind'], K.lots],
+  map247888:[['cross', '#222', 'Closed zone'], ['dots', '#333', 'Controlled hunting zone', '#b9b9b9'], ['dots', '#777', 'Potential marsh', '#eee'], ['sym', '■', 'Parking lots'], ['dash', '#222', 'Route to Parking Lot B'], ['sym', '✱', 'Hunter check station']],
+  map247886:[['fill', '#7d7d7d', 'Closed zone'], ['hatch', '#222', 'Zone F'], ['cross', '#222', 'Extremely deep water'], ['sym', '◆', 'Triple blind (not maintained)'], ['sym', '⬢', 'Double blind (not maintained)'], ['sym', '♿', 'Handicap blind'], ['sym', '■', 'Parking lots']],
+  map247887:[['dash', '#222', 'Zone F boundary, Zone F permit required'], ['sym', '◆', 'Spaced blinds F-1 to F-3'], ['sym', '■', 'Parking lots'], ['line', '#222', 'Route to blinds']],
+  map247885:[['hatch', '#222', 'Private property, no entry'], ['dots', '#555', 'Potential marsh', '#eee'], ['line', '#777', 'Wildlife area boundary'], ['sym', '■', 'Parking lots'], ['dash', '#222', 'Public access roads'], ['sym', '✱', 'Hunter check station']],
+  map184517:[['cross', '#222', 'Assigned pond area'], ['fill', '#b0b0b0', 'Closed zone'], ['dots', '#333', 'Zone 6', '#ccc'], ['fill', '#f4c4c4', 'Hunt zone 4A'], ['fill', '#f8e6b4', 'Hunt zone 4B'], ['fill', '#d8f2c0', 'Hunt zone 5'], ['fill', '#cfe6f8', 'Hunt zone 8'], ['fill', '#ddc8f2', 'Hunt zone 10'], ['fill', '#555', 'Permanent water'], ['sym', '■', 'Parking lots'], ['dash', '#222', 'Public access roads']],
+  map184518:zone6(), map184519:zone6(),
+  map247892:[['dots', '#666', 'Assigned ponds', '#eee'], ['fill', '#b0b0b0', 'Closed zone'], ['fill', '#ddd', 'Water channels, 2 to 3 ft deep'], ['sym', '■', 'Tank blind'], ['sym', '⬟', 'Platform blind'], ['sym', '▲', 'Stake blind'], ['sym', '◓', 'Dirt mound blind'], ['sym', '●', 'Parking lots'], ['dash', '#222', 'Public access road']],
+  map87913:[['fill', '#8a8a8a', 'Closed zone'], ['dots', '#555', 'Permanent water', '#eee'], ['sym', '●', 'Parking lots'], ['dash', '#222', 'Vehicle access'], ['sym', '✱', 'Check station'], ['fill', '#555', 'Bridge']],
+  map87839:[['line', '#7ee081', 'Pond or field'], ['hatch', '#d6321f', 'Closed zones'], ['sym', 'P', 'Parking lots'], ['sym', '♿', 'Mobility-impaired hunting sites'], ['dash', '#222', 'Access roads'], ['sym', '⚑', 'Check station']],
+  map87746:[['fill', TAN, 'Wildlife area'], ['dots', '#333', 'Grain fields', TAN], ['line', '#555', 'Fields'], ['cross', '#222', 'Closed zone'], ['sym', '▲', 'Blind'], ['sym', '♿', 'ADA blind'], ['sym', 'P', 'Parking'], ['fill', '#dff0b0', 'National forest']],
+  map88803:[['fill', TAN, 'Wildlife area'], ['fill', '#2f7f9e', 'Wetlands'], ['dots', '#555', 'Grain fields', '#ddd'], ['cross', '#222', 'Closed zone'], ['hatch', '#222', 'Retrieving zone'], ['fill', '#f2a93b', 'Special use area, no waterfowl hunting'], ['sym', '■', '4-man pit blind'], ['sym', '▲', '2-man pit blind'], ['sym', 'P', 'Parking'], ['line', '#d6321f', 'Closed road']],
+  map87812:honey(), map87813:honey(),
+  map87823:[['fill', TAN, 'Wildlife area'], ['fill', '#e0d9a0', 'National wildlife refuge']],
+  map87859:[['fill', TAN, 'Wildlife area']], map87742:[['fill', TAN, 'Wildlife area']]
+};
+function zone6(){ return [['dash', '#222', 'Zone 6 boundary, Zone 6 permit required'], ['hatch', '#222', 'Closed zone'], ['dots', '#555', 'Semi-permanent water', '#eee'], ['sym', '■', 'Tank blind'], ['sym', '⬟', 'Platform blind'], ['sym', '◓', 'Dirt mound blind'], ['sym', '✚', 'Hunt site, assigned zone'], ['sym', '♿', 'Mobility-impaired platform'], ['sym', '●', 'Parking lots']]; }
+function honey(){ return [['line', '#f0a020', 'Wildlife area'], ['line', '#7ee081', 'Pond or field'], ['hatch', '#d6321f', 'Closed'], ['fill', '#2f7f9e', 'Water, levels vary'], ['sym', 'P', 'Parking'], ['sym', '♿', 'Mobility-impaired parking and blinds'], ['sym', '⛺', 'Camping area'], ['sym', '⚑', 'Check station']]; }
+function swatch([type, c, , bg]){
+  if (type === 'sym') return `<i class="sk sym">${c}</i>`;
+  const base = bg || '#f2f1ea';
+  const css = {
+    fill:`background:${c}`,
+    hatch:`background:repeating-linear-gradient(45deg,${c} 0 1.500px,${base} 1.500px 4px)`,
+    stripe:`background:repeating-linear-gradient(90deg,${c} 0 3px,${base} 3px 6px)`,
+    cross:`background:repeating-linear-gradient(45deg,${c} 0 1px,transparent 1px 4px),repeating-linear-gradient(-45deg,${c} 0 1px,${base} 1px 4px)`,
+    dots:`background:radial-gradient(${c} 1px,${base} 1.200px) 0 0/4px 4px`,
+    line:`background:${base};box-shadow:inset 0 0 0 2px ${c}`,
+    dash:`background:repeating-linear-gradient(90deg,${c} 0 3px,${base} 3px 5px) center/100% 3px no-repeat,${base}`
+  }[type];
+  return `<i class="sk" style="${css}"></i>`;
+}
+const stateKeyFor = meta => meta && STATE_KEY[(meta.img.match(/(map[^/.]+)\./) || [])[1]];
 let facilities = [], facilityLayer = null;
 const FAC_ICON = {
   blind: a => L.divIcon({className:'', iconSize:[16, 16], iconAnchor:[8, 8], html:`<div class="fac blind${a ? ' ada' : ''}"></div>`}),
@@ -508,6 +555,8 @@ function drawFacilities(id){
   })).addTo(map);
 }
 function keyFor(id){
+  const sk = stateKeyFor(activeOverlayMeta);
+  if (sk && $('#l-overlay').checked) return sk.map(e => `<div>${swatch(e)}<span>${esc(e[2])}</span></div>`);
   const spec = AREA[id], area = spec ? spec[0] : MASK[id], unit = spec && spec[1];
   const kinds = [...new Set(boundaryFeatures.filter(f => f.properties.area === area && (!unit || f.properties.unit === unit)).map(f => f.properties.kind).filter(Boolean))];
   const order = ['free', 'ponds', 'upland', 'unit', 'closed'].filter(k => kinds.includes(k));
@@ -517,6 +566,26 @@ function keyFor(id){
   if (fac.some(f => f.t === 'parking')) rows.push('<div><i class="fac park">P</i><span>Parking</span></div>');
   if (!order.length && boundaryFeatures.some(f => f.properties.area === area)) rows.push('<div><i class="sw line"></i><span>State property line</span></div>');
   return rows;
+}
+function ptIn(pt, ring){
+  let hit = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > pt.lat) !== (yj > pt.lat) && pt.lng < (xj - xi) * (pt.lat - yi) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+const inFeature = (ll, f) => (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates)
+  .some(poly => poly.reduce((inside, ring) => ptIn(ll, ring) ? !inside : inside, false));
+/* These units share one state boundary, so their own hunt map's frame also limits them. */
+const UNIT_MAPS = ['howard', 'littledry', 'llano', 'saltslough', 'gadwall', 'china', 'dakin', 'fleming'];
+function insideRefuge(id, ll){
+  const spec = AREA[id], area = spec ? spec[0] : MASK[id], unit = spec && spec[1];
+  const fs = boundaryFeatures.filter(f => f.properties.area === area && (!unit || f.properties.unit === unit));
+  if (UNIT_MAPS.includes(id) && overlaysFor(id)[0] && !overlayBounds(overlaysFor(id)[0]).pad(.03).contains(ll)) return false;
+  if (fs.length) return fs.some(f => inFeature(ll, f));
+  const b = refugeBounds(id);
+  return b && b.isValid() ? b.contains(ll) : map.distance(ll, markers[id].getLatLng()) < 3000;
 }
 function drawLegend(id){
   $('#legend').innerHTML = id ? keyFor(id).join('') : Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
@@ -544,6 +613,7 @@ function setOverlay(meta){
   activeOverlayMeta = meta;
     if (meta && map && $('#l-overlay').checked) { activeOverlay = new CornerOverlay(meta, overlayOpacity); activeOverlay.addTo(map); }
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!meta && b.dataset.ov === meta.img));
+  drawLegend(selected);
 }
 function focusRefuge(r){
   if (!map) return;
@@ -552,6 +622,7 @@ function focusRefuge(r){
   const b = refugeBounds(r.id);
   setSheet('half');
   setTimeout(() => {
+    if (selected !== r.id) return;
     if (b && b.isValid()) map.fitBounds(b, Object.assign(fitOpts(), {maxZoom:15}));
     else map.setView(markers[r.id].getLatLng(), 12);
   }, 280);
@@ -782,7 +853,7 @@ function openDetail(id, keepScroll){
   const el = $('#detail');
   const scroll = el.scrollTop;
   el.innerHTML = `<div class="pad">
-    <button class="back" id="back">← All refuges</button>
+    <div><button class="back" id="back">← All refuges</button><p class="quiet">Or tap the map outside this area.</p></div>
     <div><div class="kicker">${esc(r.region)} · Type ${r.kind} area</div><h2>${esc(r.name)}</h2></div>
     <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button></div>
     <div id="pane-birds" class="pad" style="padding:0" ${detailPane === 'birds' ? '' : 'hidden'}>${birdPage(r)}</div>
@@ -831,6 +902,7 @@ function openDetail(id, keepScroll){
 }
 function closeDetail(){
   $('#detail').hidden = true; selected = null;
+  setTab(document.querySelector('nav button[aria-selected="true"]').dataset.tab);
   Object.keys(markers).forEach(k => markers[k].setIcon(pinIcon(REFUGES.find(z => z.id === k))));
   setFocus(null);
   if (map) { setOverlay(null); map.fitBounds(CA_BOUNDS, fitOpts()); }
