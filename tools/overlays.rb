@@ -174,6 +174,12 @@ Dir.mktmpdir do |tmp|
   File.binwrite(src, fetch(url))
   system('sips', '-s', 'format', 'png', '-Z', WIDTH.to_s, src, '--out', File.join(OUT, 'map245149.png'), out: File::NULL, err: File::NULL)
 end
+# San Jacinto's waterfowl map is a schematic, not to scale, so it's only rendered for viewing.
+Dir.mktmpdir do |tmp|
+  src = File.join(tmp, 'sanjacinto.pdf')
+  File.binwrite(src, fetch('https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=135641&inline'))
+  system('sips', '-s', 'format', 'png', '-Z', WIDTH.to_s, src, '--out', File.join(OUT, 'map135641.png'), out: File::NULL, err: File::NULL)
+end
 a = fit(GRIZZLY_POINTS)
 ll = ->(x, y) { [(a[0][0] * x + a[0][1] * y + a[0][2]).round(6), (a[1][0] * x + a[1][1] * y + a[1][2]).round(6)] }
 errors = GRIZZLY_POINTS.map do |x, y, g|
