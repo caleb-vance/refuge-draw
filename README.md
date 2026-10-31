@@ -1,4 +1,4 @@
-# Refuge Draw
+# Refuge Rat
 
 Prototype guide to California refuge waterfowl lotteries. It uses the Ruby that ships with macOS and needs no other installs.
 

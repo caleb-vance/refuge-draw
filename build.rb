@@ -19,10 +19,14 @@ unless ARGV.include?('--offline')
   snap[:errors].each { |e| warn "  #{e}" }
 end
 
+last = File.join(ROOT, 'src/season_2025.json')
+File.write(last, JSON.generate(Cdfw.last_season)) unless File.exist?(last)
+
 safe = ->(s) { s.gsub('</', '<\/') }
 html = File.read(File.join(ROOT, 'src/app.html'))
 html = html.sub('/*LEAFLET_CSS*/') { File.read(File.join(ROOT, 'src/leaflet.css')) }
 html = html.sub('/*REFUGES*/null') { safe.call(JSON.generate(JSON.parse(File.read(File.join(ROOT, 'src/refuges.json'))))) }
+html = html.sub('/*LAST*/null') { safe.call(File.read(last)) }
 html = html.sub('/*OVERLAYS*/null') { safe.call(File.read(File.join(ROOT, 'src/overlays.json'))) }
 html = html.sub('/*SNAPSHOT*/null') { safe.call(File.read(SNAP)) }
 File.write(File.join(ROOT, 'public/index.html'), html)

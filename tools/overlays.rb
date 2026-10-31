@@ -104,7 +104,8 @@ def georef(pdf)
     zone = wkt[/UTM[_ ]Zone[_ ](\d+)/i, 1].to_i
     latlng = gp.each_slice(2).map { |a, b| a.abs > 90 ? (zone > 0 ? utm_to_latlng(a, b, zone) : nil) : [a, b] }
     next if latlng.include?(nil)
-    pts = lp.each_slice(2).zip(latlng).map { |(u, v), g| [x0 + u * (x1 - x0), y1 - v * (y1 - y0), g] }
+    # PDFs write BBox corners in either order, and LPTS follow that order, so use it as written.
+    pts = lp.each_slice(2).zip(latlng).map { |(u, v), g| [bbox[0] + u * (bbox[2] - bbox[0]), bbox[1] + v * (bbox[3] - bbox[1]), g] }
     best = { area: area, box: [x0, y0, x1, y1], pts: pts }
   end
   return nil unless best
@@ -140,6 +141,7 @@ Dir.mktmpdir do |tmp|
                       when 270 then [[x1, y1], [x1, y0], [x0, y1]]
                       else [[x0, y1], [x1, y1], [x0, y0]]
                       end.map { |c| ll.call(*c) }
+            raise 'map would be upside down' unless corners[0][0] > corners[2][0] && corners[1][1] > corners[0][1]
             bx0, by0, bx1, by1 = g[:box]
             w = x1 - x0
             h = y1 - y0

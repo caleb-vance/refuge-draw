@@ -9,7 +9,7 @@ module Cdfw
   UA = 'CA-Refuge-Draw-Prototype/0.1'.freeze
   DRAW_PAGES = %w[Kesterson Los-Banos Salt-Slough Wister San-Jacinto Yolo Sacramento Colusa Delevan Sutter].freeze
   RESULTS_PAGE = 'https://wildlife.ca.gov/Hunting/Waterfowl'.freeze
-  HARVEST_FILES = 6
+  HARVEST_FILES = 40
   SEED_BUTTE = [247917, 247918].freeze
 
   module_function
@@ -112,6 +112,23 @@ module Cdfw
       { area: r[0], date: r[1], hunters: r[2].to_i, ducks: r[3].to_i, geese: r[4].to_i, birds: r[5].to_i,
         avg: r[8] && r[8] =~ /\A[\d.]+\z/ ? r[8].to_f : nil, top: r[9..10].to_a.compact }
     end
+  end
+
+  LAST_SEASON_DOC = 247256
+
+  def area_key(name)
+    name.to_s.upcase.sub('(NO.GL)', '(N GRASSLANDS)').sub('DRY CK.', 'DRY CREEK').strip
+  end
+
+  # Totals for each area from CDFW's full-season results file.
+  def last_season
+    rows = parse_harvest(get(doc_url(LAST_SEASON_DOC))).uniq { |r| [area_key(r[:area]), r[:date]] }
+    rows.select { |r| r[:hunters] > 0 }.group_by { |r| area_key(r[:area]) }.map do |key, list|
+      species = Hash.new(0)
+      list.each { |r| r[:top].uniq.each { |s| species[s] += 1 if s =~ /\A[A-Z]{4}\z/ } }
+      [key, { days: list.size, hunters: list.sum { |r| r[:hunters] }, ducks: list.sum { |r| r[:ducks] }, geese: list.sum { |r| r[:geese] },
+              birds: list.sum { |r| r[:birds] }, species: species }]
+    end.to_h
   end
 
   def harvest(errors)

@@ -1,170 +1,162 @@
-<title>Refuge Draw</title>
+<title>Refuge Rat</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%230d0f11'/%3E%3Cpath fill='%23f2c230' d='M14 34C14 23 22 16 30 17c4 .4 7 3 9 6l6 5c1 1 .5 2.500-1 2.500H38c-3 3-8 4.500-13 4.500-6 0-11-.5-11-1z'/%3E%3Ccircle cx='31' cy='15' r='5.500' fill='%23f2c230'/%3E%3Cpath d='M15 33C6 33 3 27 6 21S14 12 9 6' fill='none' stroke='%23f2c230' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Saira+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100,500;100,700;125,800&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>/*LEAFLET_CSS*/</style>
 <style>
-/* Layout: full-bleed satellite map with a draggable pull-up sheet; the sheet becomes a side panel on wide screens.
-   Color: one committed dark look from a blind at first light. Tule olive, field tan, blaze orange for action. */
+/* Layout: the map is the page, one quiet sheet holds everything else. Few colors, thin lines, no ornament.
+   Color: near-black with one signal yellow, for a phone read in the dark before shoot time. */
 :root{
   color-scheme:dark;
-  --bg:#10140d;--surface:#1a2015;--raised:#262e1f;--line:#3b4530;--ink:#f0f1e4;--muted:#a9b198;
-  --blaze:#ff6a13;--blaze-ink:#180800;--tan:#cdb67f;--moss:#8fb04f;--red:#ef5a4a;--sky:#7fb4e8;--slate:#9aa0a6;
-  --accent:var(--blaze);--tint:#2d3524;--warn-bg:#3b2a0e;--warn:#f6cd80;
-  --brand:"Black Ops One","Impact",sans-serif;
-  --display:"Saira Condensed","Arial Narrow",sans-serif;
-  --body:"Barlow",system-ui,sans-serif;
+  --bg:#0d0f11;--surface:#16191c;--raised:#1f2327;--line:#2a2f34;--ink:#f3f4f2;--muted:#9aa1a6;
+  --accent:#f2c230;--accent-ink:#141104;--red:#ff5c4d;--green:#7ee081;
+  --warn-bg:#2b2410;--warn:#f2d680;
+  --display:"Archivo",system-ui,sans-serif;
+  --body:"Archivo",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  --topo:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='160' fill='none' stroke='%23cdb67f' stroke-opacity='.13'%3E%3Cpath d='M-10 40C40 10 90 70 150 40s110-30 180 5M-10 70c50-30 90 30 150 5s120-35 190 5M-10 100c60-30 100 25 160 5s110-30 180 0M-10 130c50-25 110 25 170 5s100-25 170 0M60 22c20-14 50-10 62 2 10 12-12 22-34 20-22-1-42-11-28-22z'/%3E%3C/svg%3E");
 }
 [hidden]{display:none!important}
-.sheet-full #tools{display:none}
-@media (min-width:860px){.sheet-full #tools{display:flex}}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);overflow:hidden}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);font-stretch:100%;overflow:hidden}
 #app{position:absolute;inset:0;overflow:hidden}
-#map{position:absolute;inset:0;z-index:0;background:#1d2a24}
-.leaflet-container{font-family:var(--body);background:#1d2a24}
-h1,h2,h3{font-family:var(--display);font-weight:700;line-height:1.08;margin:0;text-wrap:balance}
-h2{font-size:30px;letter-spacing:.01em;text-transform:uppercase}
-h3{font-size:20px;letter-spacing:.03em;text-transform:uppercase;color:var(--tan)}
+#map{position:absolute;inset:0;z-index:0;background:var(--bg)}
+.leaflet-container{font-family:var(--body);background:var(--bg)}
+h2,h3{font-family:var(--display);line-height:1.12;margin:0;text-wrap:balance}
+h2{font-size:24px;font-weight:700}
+h3{font-size:16px;font-weight:700}
 p{margin:0}
-a{color:var(--blaze)}
-button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+a{color:var(--accent)}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-/* map chrome */
-#brand{position:absolute;z-index:500;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));font:400 19px var(--brand);letter-spacing:.03em;color:var(--ink);background:rgba(16,20,13,.82);border:1px solid var(--line);border-radius:4px;padding:6px 10px;pointer-events:none}
-#brand i{font-style:normal;color:var(--blaze)}
-#tools{position:absolute;z-index:900;top:calc(env(safe-area-inset-top,0px) + 10px);right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;align-items:flex-end}
-.tool{all:unset;box-sizing:border-box;cursor:pointer;width:44px;height:44px;display:grid;place-items:center;background:rgba(16,20,13,.88);border:1px solid var(--line);border-radius:6px;color:var(--ink)}
-.tool[aria-expanded="true"]{background:var(--blaze);color:var(--blaze-ink);border-color:var(--blaze)}
-.tool svg{width:22px;height:22px}
-#layers{width:min(290px,calc(100vw - 24px));background:rgba(26,32,21,.97);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;font-size:14px}
-#layers .kicker{margin-bottom:-4px}
-.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-.seg button{all:unset;cursor:pointer;text-align:center;padding:8px;font:700 15px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--blaze);color:var(--blaze-ink)}
+/* top of the map */
+#brand{position:absolute;z-index:500;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(12px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:8px;background:rgba(13,15,17,.86);border-radius:10px;padding:5px 12px 5px 6px;pointer-events:none}
+#brand svg{width:34px;height:34px;flex:none}
+#brand span{font:800 18px/1 var(--display);font-stretch:125%;letter-spacing:-.01em;white-space:nowrap}
+#top{position:absolute;z-index:900;top:calc(env(safe-area-inset-top,0px) + 10px);right:max(12px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#shoot{background:rgba(13,15,17,.86);border-radius:10px;padding:6px 11px;text-align:right;line-height:1.15;font-variant-numeric:tabular-nums}
+#shoot small{display:block;font-size:11px;color:var(--muted)}
+#shoot b{display:block;font:700 19px/1.1 var(--display);color:var(--accent);white-space:nowrap}
+.tools{display:flex;gap:8px}
+.tool{all:unset;box-sizing:border-box;cursor:pointer;width:42px;height:42px;display:grid;place-items:center;background:rgba(13,15,17,.86);border-radius:10px;color:var(--ink)}
+.tool[aria-expanded="true"]{background:var(--accent);color:var(--accent-ink)}
+.tool svg{width:21px;height:21px}
+#layers{width:min(260px,calc(100vw - 24px));background:var(--surface);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:11px;font-size:14px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--bg);border-radius:8px;padding:3px}
+.seg button{all:unset;cursor:pointer;text-align:center;padding:7px;font-weight:500;font-size:14px;border-radius:6px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--raised);color:var(--ink)}
 .chk{display:flex;gap:8px;align-items:center;font-weight:500;margin:0;cursor:pointer}
-.chk input{accent-color:var(--blaze);width:18px;height:18px;margin:0;flex:none}
-input[type=range]{width:100%;accent-color:var(--blaze)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:13px;color:var(--muted)}
-.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:2px solid}
-.lg-open{border-color:#8dff5a!important;background:rgba(141,255,90,.28)}
-.lg-closed{border-color:#ff4a3d!important;background:rgba(255,74,61,.38)}
-.lg-state{border-color:#ffb020!important}
-#note{position:absolute;z-index:500;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 62px);background:rgba(16,20,13,.92);border:1px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px;max-width:min(320px,calc(100vw - 110px))}
-.pin{width:16px;height:16px;transform:rotate(45deg);border:2px solid #fff;box-shadow:0 0 0 1px #000,0 1px 6px #000}
-.pin.sel{outline:3px solid var(--blaze);outline-offset:3px}
-.leaflet-tooltip.pinlabel{background:rgba(16,20,13,.88);border:0;color:var(--ink);box-shadow:none;font:700 13px var(--display);letter-spacing:.03em;padding:1px 6px;display:none}
+.chk input{accent-color:var(--accent);width:18px;height:18px;margin:0;flex:none}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+#note{position:absolute;z-index:500;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 110px);background:var(--surface);border-radius:8px;padding:7px 11px;font-size:13px;width:max-content;max-width:calc(100vw - 32px)}
+.pin{width:13px;height:13px;border-radius:50%;background:var(--accent);border:2px solid #0d0f11;box-shadow:0 0 0 1.500px var(--accent)}
+.pin.sel{background:#fff;box-shadow:0 0 0 3px var(--accent)}
+.leaflet-tooltip.pinlabel{background:rgba(13,15,17,.82);border:0;border-radius:5px;color:var(--ink);box-shadow:none;font:500 12px var(--body);padding:1px 6px;display:none}
 .leaflet-tooltip.pinlabel::before{display:none}
 .show-labels .leaflet-tooltip.pinlabel{display:block}
-.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink)}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink);border-radius:8px}
 .leaflet-popup-content{margin:10px 12px;font:400 14px var(--body)}
-.leaflet-popup-content b{font:700 17px var(--display);display:block}
-.leaflet-top.leaflet-left{top:calc(env(safe-area-inset-top,0px) + 52px)}
-.leaflet-control-attribution{font-size:9px;background:rgba(16,20,13,.7)!important;color:var(--muted)!important}
+.leaflet-popup-content b{font-size:15px;display:block}
+.leaflet-top.leaflet-left{top:calc(env(safe-area-inset-top,0px) + 54px)}
+.leaflet-control-attribution{font-size:9px;background:rgba(13,15,17,.6)!important;color:var(--muted)!important}
 .leaflet-control-attribution a{color:var(--muted)}
-.leaflet-control-zoom{display:none}
-.overlay-map{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;max-width:none!important;image-rendering:auto}
+.overlay-map{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;max-width:none!important}
 
-/* pull-up sheet */
-#sheet{position:absolute;z-index:800;left:0;right:0;bottom:0;height:calc(100% - env(safe-area-inset-top,0px) - 56px);display:flex;flex-direction:column;background:var(--bg);border-radius:14px 14px 0 0;border-top:2px solid var(--blaze);box-shadow:0 -8px 28px rgba(0,0,0,.6);transform:translateY(var(--sheet-y,50%));transition:transform .26s cubic-bezier(.2,.8,.2,1);will-change:transform}
+/* sheet */
+#sheet{position:absolute;z-index:800;left:0;right:0;bottom:0;height:calc(100% - env(safe-area-inset-top,0px) - 56px);display:flex;flex-direction:column;background:var(--bg);border-radius:16px 16px 0 0;transform:translateY(var(--sheet-y,50%));transition:transform .24s cubic-bezier(.2,.8,.2,1);will-change:transform}
 #sheet.dragging{transition:none}
-#grab{flex:none;touch-action:none;cursor:grab;background:var(--topo) center/320px,var(--surface);border-radius:12px 12px 0 0;user-select:none;-webkit-user-select:none}
-#handle{width:100%;padding:9px 0 5px;display:block;background:none;border:0;cursor:grab}
-#handle span{display:block;width:46px;height:5px;margin:auto;border-radius:3px;background:repeating-linear-gradient(90deg,var(--tan) 0 6px,transparent 6px 8px)}
-nav{display:grid;grid-template-columns:repeat(3,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-nav button{all:unset;cursor:pointer;text-align:center;padding:6px 4px 10px;font:700 18px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:3px solid transparent}
-nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blaze)}
+.sheet-full #top{display:none}
+#grab{flex:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;border-bottom:1px solid var(--line)}
+#handle{width:100%;padding:9px 0 4px;display:block;background:none;border:0;cursor:grab}
+#handle span{display:block;width:36px;height:4px;margin:auto;border-radius:2px;background:var(--line)}
+nav{display:grid;grid-template-columns:repeat(4,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav button{all:unset;cursor:pointer;text-align:center;padding:7px 2px 11px;font-weight:500;font-size:15px;color:var(--muted)}
+nav button[aria-selected="true"]{color:var(--accent);font-weight:700}
 #body{flex:1;min-height:0;position:relative;padding-bottom:env(safe-area-inset-bottom,0px)}
-#detail{background:var(--bg);z-index:5}
-.view{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.view{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--bg)}
+#detail{z-index:5}
 .pad{padding-block:14px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
-#filters{display:flex;gap:6px;overflow-x:auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));scrollbar-width:none;position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line)}
-.chip{all:unset;cursor:pointer;flex:none;font-weight:600;font-size:13px;padding:6px 11px;border:1px solid var(--line);border-radius:4px;background:var(--surface);display:inline-flex;align-items:center;gap:6px}
-.chip[aria-pressed="true"]{background:var(--blaze);color:var(--blaze-ink);border-color:var(--blaze)}
-.dot{width:10px;height:10px;transform:rotate(45deg);flex:none;display:inline-block}
-.d-night{background:var(--sky)}.d-morning{background:var(--moss)}.d-line{background:var(--tan)}.d-none,.d-call{background:var(--slate)}
-.chip[aria-pressed="true"] .dot{outline:1px solid var(--blaze-ink)}
-.rg{font:700 15px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--tan);padding-block:14px 6px;padding-left:max(16px,env(safe-area-inset-left,0px))}
-/* each refuge row is a paper hunt tag: punched hole, perforation, odds on the stub */
-.row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) 82px;align-items:stretch;margin:0 max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));width:calc(100% - 24px);background:var(--surface);border:1px solid var(--line);border-radius:6px;position:relative}
-.row:hover{background:var(--raised)}
-.row .hole{display:grid;place-items:center;padding-left:12px}
-.row .hole .dot{width:12px;height:12px}
-.row .txt{padding:10px 10px 10px 11px;display:flex;flex-direction:column;gap:1px;min-width:0}
-.row b{font:700 18px/1.12 var(--display);letter-spacing:.02em}
+.rg{font-size:13px;font-weight:500;color:var(--muted);padding-block:16px 4px;padding-left:max(16px,env(safe-area-inset-left,0px))}
+.row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding-block:11px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
+.row:hover{background:var(--surface)}
+.row .txt{display:flex;flex-direction:column;min-width:0}
+.row b{font-weight:500;font-size:16px;line-height:1.25}
 .row small{color:var(--muted);font-size:13px}
-.row .odds{border-left:2px dashed var(--line);display:flex;flex-direction:column;justify-content:center;align-items:center;font:700 20px/1 var(--display);padding:6px 2px;color:var(--ink)}
-.row .odds span{font:500 10px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
-.back{all:unset;cursor:pointer;font:700 16px var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--blaze)}
-.kicker{font:700 14px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--tan)}
+.row .odds{font-weight:700;font-size:15px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.row .odds span{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.back{all:unset;cursor:pointer;font-weight:500;color:var(--accent)}
+.kicker{font-size:13px;font-weight:500;color:var(--muted)}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
-.btn{display:inline-block;text-decoration:none;font:700 15px var(--display);letter-spacing:.04em;text-transform:uppercase;padding:9px 12px;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
-.btn.main,.btn[aria-pressed="true"]{background:var(--blaze);border-color:var(--blaze);color:var(--blaze-ink)}
-.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
-.stats div{background:var(--surface);padding:9px 10px;min-width:0}
-.stats b{display:block;font:700 25px/1.1 var(--display)}
+.btn{display:inline-block;text-decoration:none;font-weight:500;font-size:14px;padding:9px 12px;border-radius:8px;background:var(--raised);color:var(--ink);border:0;cursor:pointer}
+.btn.main,.btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stats div{background:var(--surface);border-radius:8px;padding:10px;min-width:0}
+.stats b{display:block;font-weight:700;font-size:22px;line-height:1.15;font-variant-numeric:tabular-nums}
 .stats span{font-size:12px;color:var(--muted)}
 section{display:flex;flex-direction:column;gap:9px;min-width:0}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 13px;min-width:0}
-.warn{background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:9px 12px;font-size:14px;border-left:4px solid var(--blaze)}
+.card{background:var(--surface);border-radius:8px;padding:12px 13px;min-width:0}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 12px;font-size:14px}
 .quiet{color:var(--muted);font-size:13px;margin:0}
+.big{font-weight:800;font-stretch:125%;font-size:48px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar{display:grid;grid-template-columns:44px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:13px;font-variant-numeric:tabular-nums}
+.bar i{display:block;height:10px;border-radius:3px;background:var(--accent);min-width:2px}
+.bar span:first-child{color:var(--muted)}
+.bar span:last-child{text-align:right}
+.sp{grid-template-columns:minmax(0,132px) minmax(0,1fr) 34px}
+.sp span:first-child{color:var(--ink)}
 ol.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-ol.tl li{display:grid;grid-template-columns:82px minmax(0,1fr);gap:12px;padding-block:11px;border-top:1px solid var(--line)}
+ol.tl li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:12px;padding-block:11px;border-top:1px solid var(--line)}
 ol.tl li:first-child{border-top:0}
-.when{font:700 18px/1.1 var(--display)}
-.when small{display:block;font:400 12px var(--body);color:var(--muted);margin-top:2px}
+.when{font-weight:700;font-size:15px;line-height:1.2}
+.when small{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
 li.past .when,li.past .what{opacity:.5}
-li.key .when{color:var(--blaze)}
-.what b{display:block;font-weight:600}
+li.key .when{color:var(--accent)}
+.what b{display:block;font-weight:500}
 .what{min-width:0;font-size:14px}
-input[type=date],input[type=text]{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink);width:100%;max-width:260px}
+input[type=date],input[type=text]{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;max-width:260px}
 input.mono{font-family:var(--mono);max-width:none}
-label{font-weight:600;font-size:14px;display:block;margin-bottom:4px}
+label{font-weight:500;font-size:14px;display:block;margin-bottom:4px}
 table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
 th{font-size:12px;text-align:left;color:var(--muted);font-weight:500;padding:4px 6px;border-bottom:1px solid var(--line)}
 td{padding:6px;border-bottom:1px solid var(--line)}
 td.n,th.n{text-align:right}
 td.mono{font:500 13px var(--mono);white-space:nowrap}
 .scroll{overflow-x:auto}
-details{background:var(--surface);border:1px solid var(--line);border-radius:6px;min-width:0}
-summary{cursor:pointer;padding:11px 13px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-weight:600}
+details{background:var(--surface);border-radius:8px;min-width:0}
+summary{cursor:pointer;padding:11px 13px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-weight:500}
 summary span{font-weight:400;font-size:13px;color:var(--muted);white-space:nowrap}
 details .inner{padding:0 13px 12px;display:flex;flex-direction:column;gap:8px}
-.tag{font-size:12px;padding:2px 7px;border-radius:3px;background:var(--tint);color:var(--ink);font-weight:500}
+.tag{font-size:12px;padding:1px 6px;border-radius:4px;background:var(--raised);font-weight:500}
 .tag.old{background:var(--warn-bg);color:var(--warn)}
 #hit{font-size:15px}
-#hit.ok{border:2px solid var(--blaze)}
-#hit b.entry{font:700 34px/1 var(--display);color:var(--blaze);text-transform:uppercase;display:block;margin-bottom:4px}
+#hit b.entry{font-weight:800;font-size:30px;line-height:1.1;color:var(--accent);display:block;margin-bottom:4px}
 ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px}
-ul.plain li::marker{color:var(--blaze)}
 @media (min-width:860px){
-  #sheet{top:0;bottom:0;left:0;right:auto;width:420px;height:100%;border-radius:0;border-top:0;border-right:2px solid var(--blaze);transform:none;transition:none}
+  #sheet{top:0;bottom:0;left:0;right:auto;width:400px;height:100%;border-radius:0;border-right:1px solid var(--line);transform:none;transition:none}
   #handle{display:none}
-  nav button{padding-top:12px}
-  #brand{left:436px}
-  #note{left:calc(50% + 210px)}
+  nav button{padding-top:13px}
+  #brand{left:414px}
+  .sheet-full #top{display:flex}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 
 <div id="app">
   <div id="map" aria-label="Satellite map of California refuges"></div>
-  <div id="brand">REFUGE<i>/</i>DRAW</div>
-  <div id="tools">
-    <button class="tool" id="layerbtn" aria-label="Map layers" aria-expanded="false" aria-controls="layers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 9l10 6 10-6-10-6z"/><path d="m2 15 10 6 10-6"/></svg></button>
-    <button class="tool" id="locate" aria-label="Show my location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/></svg></button>
+  <div id="brand"><svg viewBox="0 0 48 48" role="img" aria-label="Refuge Rat logo"><path fill="#f2c230" d="M14 34C14 23 22 16 30 17c4 .4 7 3 9 6l6 5c1 1 .5 2.500-1 2.500H38c-3 3-8 4.500-13 4.500-6 0-11-.5-11-1z"/><circle cx="31" cy="15" r="5.500" fill="#f2c230"/><circle cx="31" cy="15" r="2.500" fill="#0d0f11"/><circle cx="38" cy="25" r="1.600" fill="#0d0f11"/><path d="M15 33C6 33 3 27 6 21S14 12 9 6" fill="none" stroke="#f2c230" stroke-width="3" stroke-linecap="round"/></svg><span>Refuge Rat</span></div>
+  <div id="top">
+    <div id="shoot" aria-live="polite"></div>
+    <div class="tools">
+      <button class="tool" id="locate" aria-label="Show my location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/></svg></button>
+      <button class="tool" id="layerbtn" aria-label="Map layers" aria-expanded="false" aria-controls="layers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 9l10 6 10-6-10-6z"/><path d="m2 15 10 6 10-6"/></svg></button>
+    </div>
     <div id="layers" hidden>
-      <div class="kicker">Base map</div>
       <div class="seg"><button id="base-sat" aria-pressed="true">Satellite</button><button id="base-topo" aria-pressed="false">Topo</button></div>
-      <label class="chk"><input type="checkbox" id="l-labels" checked>Roads and place names</label>
-      <div class="kicker">Hunt layers</div>
-      <label class="chk"><input type="checkbox" id="l-bounds" checked>Official boundaries</label>
-      <div class="legend"><span><i class="lg-open"></i>Hunt unit</span><span><i class="lg-closed"></i>Closed zone</span><span><i class="lg-state"></i>State area line</span></div>
-      <label class="chk"><input type="checkbox" id="l-overlay" checked>Hunt map overlay</label>
-      <div><label for="l-opacity">Overlay strength</label><input type="range" id="l-opacity" min="20" max="100" value="85"></div>
-      <p class="quiet" id="ov-name">Pick a refuge to lay its hunt map on the imagery.</p>
+      <label class="chk"><input type="checkbox" id="l-overlay" checked>Hunt map</label>
+      <div><label for="l-opacity" class="quiet">Hunt map strength</label><input type="range" id="l-opacity" min="20" max="100" value="85"></div>
+      <label class="chk"><input type="checkbox" id="l-bounds" checked>Boundaries</label>
+      <p class="quiet">Green is a hunt unit, red is closed, and white is a state property line.</p>
     </div>
   </div>
   <div id="note" hidden role="status"></div>
@@ -173,12 +165,14 @@ ul.plain li::marker{color:var(--blaze)}
       <button id="handle" aria-label="Resize panel"><span></span></button>
       <nav role="tablist">
         <button role="tab" data-tab="map" aria-selected="true">Refuges</button>
-        <button role="tab" data-tab="how" aria-selected="false">The Process</button>
+        <button role="tab" data-tab="birds" aria-selected="false">Birds</button>
         <button role="tab" data-tab="draw" aria-selected="false">Draws</button>
+        <button role="tab" data-tab="how" aria-selected="false">Guide</button>
       </nav>
     </div>
     <div id="body">
-      <div class="view" id="mapview"><div id="filters"></div><div id="list"></div></div>
+      <div class="view" id="mapview"><div id="list"></div></div>
+      <div class="view" id="birdview" hidden></div>
       <div class="view" id="howview" hidden></div>
       <div class="view" id="drawview" hidden></div>
       <div class="view" id="detail" hidden></div>
@@ -191,6 +185,7 @@ ul.plain li::marker{color:var(--blaze)}
 const REFUGES = /*REFUGES*/null;
 let DATA = /*SNAPSHOT*/null;
 const OVERLAYS = /*OVERLAYS*/null;
+const LAST_SEASON = /*LAST*/null;
 const LICENSE_URL = 'https://www.licenses.wildlife.ca.gov/internetsales';
 const INFO_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=70431&inline';
 const NEWS_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=70409&inline';
@@ -204,10 +199,12 @@ const VAC = {
   none:{label:'Reservation only',dot:'d-none'},
   call:{label:'Type B, call the area',dot:'d-call'}
 };
-const SPECIES = {MALL:'Mallard',AGWT:'Green-winged teal',NOPI:'Pintail',NSHO:'Shoveler',AMWI:'Wigeon',GADW:'Gadwall',GWFG:'White-fronted goose',CITE:'Cinnamon teal',WODU:'Wood duck',SNGO:'Snow goose',RNDU:'Ring-necked duck',CANG:'Canada goose',BUFF:'Bufflehead',RUDU:'Ruddy duck',LESC:'Lesser scaup'};
+const SPECIES = {CAGO:'Canada goose',ACGO:'Cackling goose',LSGO:'Snow goose',ROGO:"Ross's goose",SCAU:'Scaup',REDH:'Redhead',GOLD:'Goldeneye',MALL:'Mallard',AGWT:'Green-winged teal',NOPI:'Pintail',NSHO:'Shoveler',AMWI:'Wigeon',GADW:'Gadwall',GWFG:'White-fronted goose',CITE:'Cinnamon teal',WODU:'Wood duck',SNGO:'Snow goose',RNDU:'Ring-necked duck',CANG:'Canada goose',BUFF:'Bufflehead',RUDU:'Ruddy duck',LESC:'Lesser scaup'};
 const CA_BOUNDS = [[32.4, -124.5], [42.1, -114.0]];
 /* Which official boundary each refuge fits to: [agency area, optional hunt unit]. */
 const FWS = n => n + ' National Wildlife Refuge';
+/* Hunt map images are cut to these official boundaries, which removes titles and legends around the map. */
+const MASK = {graylodge:'Gray Lodge Wildlife Area',howard:'Upper Butte Basin Wildlife Area',littledry:'Upper Butte Basin Wildlife Area',llano:'Upper Butte Basin Wildlife Area',yolo:'Yolo Bypass Wildlife Area',joice:'Grizzly Island Wildlife Area',bearcreek:FWS('San Luis'),saltslough:'North Grasslands Wildlife Area',gadwall:'North Grasslands Wildlife Area',china:'North Grasslands Wildlife Area',losbanos:'Los Banos Wildlife Area',volta:'Volta Wildlife Area',mendota:'Mendota Wildlife Area',kern:FWS('Kern'),wister:'Imperial Wildlife Area',buttevalley:'Butte Valley Wildlife Area',shasta:'Shasta Valley Wildlife Area',dakin:'Honey Lake Wildlife Area',fleming:'Honey Lake Wildlife Area',willow:'Willow Creek Wildlife Area'};
 const AREA = {sacramento:[FWS('Sacramento')],delevan:[FWS('Delevan')],colusa:[FWS('Colusa')],sutter:[FWS('Sutter')],kern:[FWS('Kern')],
   sanluis:[FWS('San Luis'),'San Luis Unit'],kesterson:[FWS('San Luis'),'Kesterson Unit'],freitasn:[FWS('San Luis'),'North Freitas Unit'],freitass:[FWS('San Luis'),'South Freitas Unit'],merced:[FWS('Merced')],
   graylodge:['Gray Lodge Wildlife Area'],grizzly:['Grizzly Island Wildlife Area'],joice:['Grizzly Island Wildlife Area'],yolo:['Yolo Bypass Wildlife Area'],losbanos:['Los Banos Wildlife Area'],volta:['Volta Wildlife Area'],mendota:['Mendota Wildlife Area'],sanjacinto:['San Jacinto Wildlife Area'],ashcreek:['Ash Creek Wildlife Area'],buttevalley:['Butte Valley Wildlife Area'],shasta:['Shasta Valley Wildlife Area'],willow:['Willow Creek Wildlife Area']};
@@ -240,6 +237,19 @@ function sunriseUTC(date, lat, lng){
   const mins = 720 - 4 * (lng + ha) - eq;
   return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + mins * 6e4;
 }
+function sunsetUTC(date, lat, lng){
+  const rise = sunriseUTC(date, lat, lng), noon = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + (720 - 4 * lng) * 6e4;
+  return noon + (noon - rise);
+}
+function updateShoot(){
+  const box = $('#shoot'); if (!box || !map) return;
+  const sel = selected && markers[selected], at = sel ? sel.getLatLng() : map.getCenter();
+  const now = new Date();
+  let day = today(), label = 'Today';
+  if (Date.now() > sunsetUTC(day, at.lat, at.lng)) { day = addDays(day, 1); label = 'Tomorrow'; }
+  const start = sunriseUTC(day, at.lat, at.lng) - 30 * 6e4, end = sunsetUTC(day, at.lat, at.lng);
+  box.innerHTML = `<small>Shoot light · ${label}</small><b>${esc(clock(start))}</b><small>Ends ${esc(clock(end))} (est.)</small>`;
+}
 const clock = ms => new Date(ms).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:'America/Los_Angeles'});
 const roundTo5 = ms => Math.round(ms / 3e5) * 3e5;
 
@@ -260,9 +270,8 @@ function freshText(){
 /* ---------- map ---------- */
 let map, markers = {}, selected = null, filter = 'all', boundsLayer = null, boundaryFeatures = [], activeOverlay = null, activeOverlayMeta = null, overlayOpacity = .85;
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
-const VAC_COLOR = {night:'#7fb4e8', morning:'#8fb04f', line:'#cdb67f', none:'#9aa0a6', call:'#9aa0a6'};
 function pinIcon(r, sel){
-  return L.divIcon({className:'', iconSize:[16, 16], iconAnchor:[8, 8], html:`<div class="pin${sel ? ' sel' : ''}" style="background:${VAC_COLOR[r.vacType]}"></div>`});
+  return L.divIcon({className:'', iconSize:[13, 13], iconAnchor:[6.5, 6.5], html:`<div class="pin${sel ? ' sel' : ''}"></div>`});
 }
 /* Lays a GPS-tagged map image on the map from three known corners, so slight rotation stays true. */
 const CornerOverlay = L.Layer.extend({
@@ -272,7 +281,7 @@ const CornerOverlay = L.Layer.extend({
     const img = new Image();
     img.onload = () => { if (this._map) this._draw(img); };
     img.onerror = () => { flash('This hunt map image did not load.'); };
-    img.src = this.meta.img;
+    boundsReady.finally(() => { img.src = this.meta.img; });
     m.on('zoom viewreset zoomend moveend', this._place, this);
   },
   onRemove(m){ m.off('zoom viewreset zoomend moveend', this._place, this); if (this.el) this.el.remove(); this._map = null; },
@@ -291,6 +300,7 @@ const CornerOverlay = L.Layer.extend({
         else if (low > 205) p[i + 3] = Math.round(p[i + 3] * (238 - low) / 33);
       }
       x.putImageData(d, 0, 0);
+      this._mask(x, c);
       el = c;
     } catch (e) {}
     this.w = img.naturalWidth; this.h = img.naturalHeight;
@@ -301,6 +311,31 @@ const CornerOverlay = L.Layer.extend({
     this.el = el;
     this._map.getPane('overlayPane').prepend(el);
     this._place();
+  },
+  _mask(x, c){
+    const fs = boundaryFeatures.filter(f => f.properties.area === MASK[this.meta.refuge]);
+    if (!fs.length) return;
+    const [tl, tr, bl] = this.meta.corners;
+    const ax = tr[1] - tl[1], ay = tr[0] - tl[0], bx = bl[1] - tl[1], by = bl[0] - tl[0], det = ax * by - bx * ay;
+    const px = ([lng, lat]) => {
+      const dx = lng - tl[1], dy = lat - tl[0];
+      return [(dx * by - bx * dy) / det * c.width, (ax * dy - dx * ay) / det * c.height];
+    };
+    const m = document.createElement('canvas');
+    m.width = c.width; m.height = c.height;
+    const g = m.getContext('2d');
+    g.beginPath();
+    fs.forEach(f => {
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      polys.forEach(rings => rings.forEach(ring => {
+        ring.forEach((p, i) => { const [a, b] = px(p); if (i) g.lineTo(a, b); else g.moveTo(a, b); });
+        g.closePath();
+      }));
+    });
+    g.fill('evenodd');
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(m, 0, 0);
+    x.globalCompositeOperation = 'source-over';
   },
   _place(){
     if (!this.el || !this._map) return;
@@ -347,15 +382,17 @@ function initMap(){
   });
   const labels = () => $('#map').classList.toggle('show-labels', map.getZoom() >= 9);
   map.on('zoomend', labels); labels();
+  map.on('moveend', updateShoot); updateShoot();
+  setInterval(updateShoot, 60000);
   new ResizeObserver(() => map.invalidateSize()).observe($('#map'));
-  fetch('boundaries.json').then(r => r.json()).then(g => {
+  boundsReady = fetch('boundaries.json').then(r => r.json()).then(g => {
     boundaryFeatures = g.features;
     boundsLayer = L.geoJSON(g, {
       style: f => {
         const s = f.properties.status;
-        if (s === 'closed') return {color:'#ff4a3d', weight:2, fillColor:'#ff4a3d', fillOpacity:.32};
-        if (s === 'open') return {color:'#8dff5a', weight:2, fillColor:'#8dff5a', fillOpacity:.14};
-        return {color:'#ffb020', weight:2.5, fill:false, dashArray:'6 5'};
+        if (s === 'closed') return {color:'#ff5c4d', weight:1.5, fillColor:'#ff5c4d', fillOpacity:.25};
+        if (s === 'open') return {color:'#7ee081', weight:1.5, fillColor:'#7ee081', fillOpacity:.08};
+        return {color:'#ffffff', weight:1.5, opacity:.8, fill:false};
       },
       onEachFeature: (f, l) => {
         const p = f.properties, s = {closed:'Closed to hunting', open:'Hunt unit. Special regulations apply.', state:'Outer property line, not a hunt zone. Closed zones may sit inside it.'}[p.status];
@@ -374,7 +411,7 @@ function initMap(){
     });
   }).catch(() => { flash('Official boundaries did not load.'); });
 }
-const baseLayers = {}; let labelLayers;
+const baseLayers = {}; let labelLayers, boundsReady = Promise.resolve();
 function sheetCover(){ return innerWidth >= 860 ? 0 : Math.max(0, innerHeight - $('#sheet').getBoundingClientRect().top); }
 function fitOpts(){
   const wide = innerWidth >= 860;
@@ -383,8 +420,7 @@ function fitOpts(){
 function setOverlay(meta){
   if (activeOverlay) { map.removeLayer(activeOverlay); activeOverlay = null; }
   activeOverlayMeta = meta;
-  $('#ov-name').textContent = meta ? `Showing: ${meta.label}` : 'No GPS-tagged hunt map is loaded. Open the PDF from a refuge to read it.';
-  if (meta && map && $('#l-overlay').checked) { activeOverlay = new CornerOverlay(meta, overlayOpacity); activeOverlay.addTo(map); }
+    if (meta && map && $('#l-overlay').checked) { activeOverlay = new CornerOverlay(meta, overlayOpacity); activeOverlay.addTo(map); }
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!meta && b.dataset.ov === meta.img));
 }
 function focusRefuge(r){
@@ -464,7 +500,6 @@ function initControls(){
   };
   $('#base-sat').onclick = () => base('sat');
   $('#base-topo').onclick = () => base('topo');
-  $('#l-labels').onchange = e => { if (map) { if (e.target.checked) labelLayers.addTo(map); else map.removeLayer(labelLayers); } };
   $('#l-bounds').onchange = e => { if (map && boundsLayer) { if (e.target.checked) boundsLayer.addTo(map); else map.removeLayer(boundsLayer); } };
   $('#l-overlay').onchange = () => setOverlay(activeOverlayMeta);
   $('#l-opacity').oninput = e => { overlayOpacity = e.target.value / 100; if (activeOverlay) activeOverlay.setOpacity(overlayOpacity); };
@@ -480,23 +515,59 @@ function initControls(){
 }
 
 /* ---------- list ---------- */
-function renderFilters(){
-  const opts = [['all', 'All'], ['night', 'Night-before lottery'], ['morning', 'Morning lottery'], ['line', 'First-come line']];
-  $('#filters').innerHTML = opts.map(([k, l]) => `<button class="chip" aria-pressed="${filter === k}" data-f="${k}">${k === 'all' ? '' : `<i class="dot ${VAC[k].dot}"></i>`}${l}</button>`).join('');
-}
+function renderFilters(){}
 function renderList(){
   const groups = {};
   REFUGES.filter(r => filter === 'all' || r.vacType === filter).forEach(r => (groups[r.region] = groups[r.region] || []).push(r));
   $('#list').innerHTML = Object.keys(groups).map(g => `<div class="rg">${esc(g)}</div>` + groups[g].map(r => `
     <button class="row" data-id="${r.id}">
-      <span class="hole"><i class="dot ${VAC[r.vacType].dot}"></i></span>
       <span class="txt"><b>${esc(r.name)}</b><small>${esc(VAC[r.vacType].label)}</small></span>
-      <span class="odds">1 in ${r.odds.one < 10 ? r.odds.one : Math.round(r.odds.one)}<span>Draw odds</span></span>
+      <span class="odds">1 in ${r.odds.one < 10 ? r.odds.one : Math.round(r.odds.one)}<span>draw odds</span></span>
     </button>`).join('')).join('');
 }
 
 /* ---------- refuge detail ---------- */
-let huntISO = toISO(nextSaturday());
+let huntISO = toISO(nextSaturday()), detailPane = 'plan';
+const areaKey = n => String(n).toUpperCase();
+function seasonStats(r){
+  const rows = harvestFor(r);
+  if (!rows.length) return null;
+  const sum = k => rows.reduce((t, x) => t + x[k], 0), species = {};
+  rows.forEach(x => [...new Set(x.top || [])].forEach(s => { if (/^[A-Z]{4}$/.test(s)) species[s] = (species[s] || 0) + 1; }));
+  return {rows, days:rows.length, hunters:sum('hunters'), ducks:sum('ducks'), geese:sum('geese'), birds:sum('birds'), species, avg:sum('birds') / sum('hunters')};
+}
+function lastStats(r){
+  const hit = (r.harvest || []).map(n => LAST_SEASON[areaKey(n)]).find(Boolean);
+  return hit ? Object.assign({avg:hit.birds / hit.hunters}, hit) : null;
+}
+function speciesBars(sp, days){
+  const list = Object.entries(sp).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  return list.length ? `<div class="bars">${list.map(([s, n]) => `<div class="bar sp"><span>${esc(SPECIES[s] || s)}</span><i style="width:${Math.round(n / days * 100)}%"></i><span>${n}</span></div>`).join('')}</div>` : '<p class="quiet">No species reported.</p>';
+}
+function birdPage(r){
+  const s = seasonStats(r), l = lastStats(r);
+  if (!s && !l) return '<p class="quiet">CDFW has not published hunt results for this unit in the files we read.</p>';
+  let html = '';
+  if (s) {
+    const peak = Math.max(...s.rows.map(x => x.avg || 0), 1);
+    html += `<section><div class="kicker">2026-27 season so far</div><div class="big">${s.avg.toFixed(1)}</div><p class="quiet">birds per hunter, across ${s.days} hunt day${s.days === 1 ? '' : 's'}</p></section>
+      <div class="stats"><div><b>${(s.ducks / s.hunters).toFixed(1)}</b><span>Ducks per hunter</span></div><div><b>${(s.geese / s.hunters).toFixed(1)}</b><span>Geese per hunter</span></div><div><b>${num(s.hunters)}</b><span>Hunter visits</span></div></div>
+      <section><h3>By hunt day</h3><div class="bars">${s.rows.slice(0, 12).map(x => `<div class="bar"><span>${esc(x.date)}</span><i style="width:${Math.round((x.avg || 0) / peak * 100)}%"></i><span>${x.avg == null ? '–' : x.avg.toFixed(1)}</span></div>`).join('')}</div></section>
+      <section><h3>Species shot</h3>${speciesBars(s.species, s.days)}<p class="quiet">Number of hunt days each species ranked first or second. CDFW reports only the top two species per day, so this is not a full species count.</p></section>`;
+  } else {
+    html += '<p class="quiet">No 2026-27 results for this unit yet.</p>';
+  }
+  if (l) html += `<section><h3>Last season, 2025-26</h3><div class="stats"><div><b>${l.avg.toFixed(1)}</b><span>Birds per hunter</span></div><div><b>${l.days}</b><span>Hunt days</span></div><div><b>${num(l.hunters)}</b><span>Hunter visits</span></div></div>${speciesBars(l.species, l.days)}</section>`;
+  return html;
+}
+function renderBirds(){
+  const rows = REFUGES.map(r => ({r, s:seasonStats(r), l:lastStats(r)})).filter(x => x.s || x.l)
+    .sort((a, b) => (b.s ? b.s.avg : -1) - (a.s ? a.s.avg : -1) || (b.l ? b.l.avg : 0) - (a.l ? a.l.avg : 0));
+  $('#birdview').innerHTML = `<div class="pad" style="padding-bottom:6px"><div><h2>Bird averages</h2><p class="quiet">Birds per hunter this season, highest first. Early-season numbers can rest on only a few hunters. Tap a refuge for its species.</p></div></div>` + rows.map(({r, s, l}) => {
+    const top = s ? Object.entries(s.species).sort((a, b) => b[1] - a[1])[0] : null;
+    return `<button class="row" data-id="${r.id}" data-birds="1"><span class="txt"><b>${esc(r.name)}</b><small>${top ? esc(SPECIES[top[0]] || top[0]) + ' most often on top' : 'No results yet this season'}</small></span><span class="odds">${s ? s.avg.toFixed(1) : '–'}<span>${l ? 'last yr ' + l.avg.toFixed(1) : 'per hunter'}</span></span></button>`;
+  }).join('');
+}
 function timeline(r, hunt){
   const t = today();
   const steps = [];
@@ -569,7 +640,10 @@ function openDetail(id, keepScroll){
   el.innerHTML = `<div class="pad">
     <button class="back" id="back">← All refuges</button>
     <div><div class="kicker">${esc(r.region)} · Type ${r.kind} area</div><h2>${esc(r.name)}</h2></div>
-    ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><p class="quiet">Placed from the GPS data inside the official PDF. Tap Layers to change its strength.</p></section>` : `<div class="warn">This hunt map has no GPS data, so it can't be laid on the imagery. ${AREA[r.id] ? 'The official boundary is drawn instead. Open' : 'Open'} the PDF for the zones.</div>`}
+    <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button></div>
+    <div id="pane-birds" class="pad" style="padding:0" ${detailPane === 'birds' ? '' : 'hidden'}>${birdPage(r)}</div>
+    <div id="pane-plan" class="pad" style="padding:0" ${detailPane === 'plan' ? '' : 'hidden'}>
+    ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><p class="quiet">Placed from the PDF's GPS data and cut to the official boundary.</p></section>` : `<div class="warn">This hunt map has no GPS data, so it can't be laid on the imagery. ${AREA[r.id] ? 'The official boundary is drawn instead. Open' : 'Open'} the PDF for the zones.</div>`}
     <div class="kicker">Official PDFs</div>
     <div class="btns">
       ${huntMaps.map((m, i) => link(m.url, m.label, i === 0 ? 'btn main' : 'btn')).join('')}
@@ -592,29 +666,27 @@ function openDetail(id, keepScroll){
     </section>
     ${r.party ? `<section><h3>Party size</h3><p>${esc(r.party)}</p></section>` : ''}
     <section><h3>Latest lottery list</h3>${drawBlock(r)}</section>
-    <section><h3>Recent hunt results</h3>
-      ${h.length ? `<div class="card scroll"><table><thead><tr><th>Date</th><th class="n">Hunters</th><th class="n">Birds</th><th class="n">Per hunter</th><th>Top species</th></tr></thead><tbody>
-        ${h.map(x => `<tr><td>${esc(x.date)}</td><td class="n">${x.hunters}</td><td class="n">${x.birds}</td><td class="n">${x.avg == null ? '–' : x.avg.toFixed(1)}</td><td>${esc((x.top || []).map(s => SPECIES[s] || s).filter((v, i, a) => a.indexOf(v) === i).join(', '))}</td></tr>`).join('')}
-      </tbody></table></div>` : `<p class="quiet">No hunts reported for this unit in the files we pulled.</p>`}
-    </section>
     <section><h3>Contact and sources</h3>
       <p>Phone: <span style="user-select:all">${esc(r.phone)}</span></p>
       <div class="btns">${link(r.page, 'Area page', 'btn')}${link(CLOSURES_URL, 'Closures', 'btn')}${link(INFO_URL, 'Reservation table', 'btn')}</div>
     </section>
+    </div>
   </div>`;
   el.hidden = false;
   el.scrollTop = keepScroll ? scroll : 0;
   $('#back').onclick = closeDetail;
+  el.querySelectorAll('[data-pane]').forEach(b => { b.onclick = () => { detailPane = b.dataset.pane; openDetail(id, true); }; });
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
   if (!keepScroll) focusRefuge(r);
+  updateShoot();
   $('#huntdate').onchange = e => { if (e.target.value) { huntISO = e.target.value; openDetail(id, true); } };
 }
 function closeDetail(){
   $('#detail').hidden = true; selected = null;
   Object.keys(markers).forEach(k => markers[k].setIcon(pinIcon(REFUGES.find(z => z.id === k))));
   if (map) setOverlay(null);
-  $('#ov-name').textContent = 'Pick a refuge to lay its hunt map on the imagery.';
+  updateShoot();
 }
 
 /* ---------- how it works ---------- */
@@ -660,7 +732,7 @@ function renderHow(){
     </tbody></table></div></section>
     <div class="warn">Bird flu (H5N1) is circulating. Wear gloves when cleaning birds, cook game to 165°F and do not feed dogs raw waterfowl.</div>
     <section><h3>Official sources</h3><div class="btns">${link(NEWS_URL, '2026 newsletter', 'btn')}${link(INFO_URL, 'Reservation table', 'btn')}${link(STATS_URL, 'Drawing statistics', 'btn')}</div>
-    <p class="quiet">Refuge Draw is an unofficial prototype. It is not made by or affiliated with CDFW or USFWS. Rules change during the season, so confirm with the area before you go.</p></section>
+    <p class="quiet">Refuge Rat is an unofficial prototype. It is not made by or affiliated with CDFW or USFWS. Rules change during the season, so confirm with the area before you go.</p></section>
   </div>`;
 }
 
@@ -716,16 +788,18 @@ function setTab(t){
   $('#mapview').hidden = t !== 'map';
   $('#howview').hidden = t !== 'how';
   $('#drawview').hidden = t !== 'draw';
+  $('#birdview').hidden = t !== 'birds';
   $('#detail').hidden = true;
   if (t === 'map' && selected) { $('#mapview').hidden = true; $('#detail').hidden = false; }
 }
 function renderAll(){
   renderDraws();
+  renderBirds();
   if (selected) openDetail(selected, true);
 }
 document.addEventListener('click', e => {
   const tab = e.target.closest('nav button'); if (tab) { setTab(tab.dataset.tab); return; }
-  const row = e.target.closest('.row'); if (row) { openDetail(row.dataset.id); return; }
+  const row = e.target.closest('.row'); if (row) { detailPane = row.dataset.birds ? 'birds' : 'plan'; setTab('map'); openDetail(row.dataset.id); return; }
   const chip = e.target.closest('.chip');
   if (chip) { filter = chip.dataset.f; renderFilters(); renderList(); applyFilter(); }
 });
