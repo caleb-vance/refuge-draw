@@ -162,6 +162,27 @@ Dir.mktmpdir do |tmp|
     end
   end
 end
+# Maps without GPS data, aligned by matching landmarks on the map to the official boundary.
+# Each point is [x, y on a 1100 x 850 copy of the map, lat, lng].
+to_ll = ->(sx, sy) { [38.17195 - sy / 600.0 * 0.10263, -122.00369 + sx / 600.0 * 0.13046] }
+GRIZZLY_POINTS = [[245, 58, 130, 95], [90, 235, 57, 195], [186, 345, 106, 238], [190, 520, 106, 348], [410, 715, 215, 440], [600, 800, 288, 490],
+                  [1030, 775, 540, 475], [880, 835, 458, 505], [975, 385, 505, 270], [765, 290, 408, 218], [582, 350, 305, 250]]
+                 .map { |x, y, sx, sy| [x, y, to_ll.call(sx, sy)] }
+url = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=245149&inline'
+Dir.mktmpdir do |tmp|
+  src = File.join(tmp, 'grizzly.pdf')
+  File.binwrite(src, fetch(url))
+  system('sips', '-s', 'format', 'png', '-Z', WIDTH.to_s, src, '--out', File.join(OUT, 'map245149.png'), out: File::NULL, err: File::NULL)
+end
+a = fit(GRIZZLY_POINTS)
+ll = ->(x, y) { [(a[0][0] * x + a[0][1] * y + a[0][2]).round(6), (a[1][0] * x + a[1][1] * y + a[1][2]).round(6)] }
+errors = GRIZZLY_POINTS.map do |x, y, g|
+  q = ll.call(x, y)
+  Math.hypot((q[0] - g[0]) * 111_000, (q[1] - g[1]) * 87_500).round
+end
+warn "grizzly landmark fit: #{errors.join(', ')} m"
+manifest << { refuge: 'grizzly', label: 'Grizzly Island waterfowl hunting map', img: 'overlays/map245149.png', approx: true,
+              corners: [ll.call(0, 0), ll.call(1100, 0), ll.call(0, 850)], clip: [4, 5, 1, 6] }
 File.write(File.join(ROOT, 'src/overlays.json'), JSON.generate(manifest))
 
 # Official boundaries
