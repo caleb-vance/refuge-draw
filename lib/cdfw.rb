@@ -126,7 +126,12 @@ module Cdfw
     rows.select { |r| r[:hunters] > 0 }.group_by { |r| area_key(r[:area]) }.map do |key, list|
       species = Hash.new(0)
       list.each { |r| r[:top].uniq.each { |s| species[s] += 1 if s =~ /\A[A-Z]{4}\z/ } }
-      [key, { days: list.size, hunters: list.sum { |r| r[:hunters] }, ducks: list.sum { |r| r[:ducks] }, geese: list.sum { |r| r[:geese] },
+      weekdays = Hash.new(0)
+      list.each do |r|
+        m, d = r[:date].split('/').map(&:to_i)
+        weekdays[Time.new(m >= 8 ? 2025 : 2026, m, d).wday] += 1
+      end
+      [key, { weekdays: weekdays, days: list.size, hunters: list.sum { |r| r[:hunters] }, ducks: list.sum { |r| r[:ducks] }, geese: list.sum { |r| r[:geese] },
               birds: list.sum { |r| r[:birds] }, species: species }]
     end.to_h
   end
@@ -147,9 +152,34 @@ module Cdfw
     { files: [], rows: [] }
   end
 
+  # Which refuge a draw PDF belongs to, read from the PDF's own title.
+  AREA_IDS = { /Kesterson/ => 'kesterson', /China Island/ => 'china', /Freitas North/ => 'freitasn', /Freitas South/ => 'freitass',
+               /Salt Slough/ => 'saltslough', /San Luis NWR/ => 'sanluis', /Los Banos/ => 'losbanos', /Volta/ => 'volta', /Merced/ => 'merced',
+               /Wister/i => 'wister', /San Jacinto/ => 'sanjacinto', /Yolo/ => 'yolo', /Howard Slough/ => 'howard', /Little Dry/ => 'littledry',
+               /Sacramento/ => 'sacramento', /Colusa/ => 'colusa', /Delevan/ => 'delevan', /Sutter/ => 'sutter', /Gadwall/ => 'gadwall',
+               /Bear Creek/ => 'bearcreek', /Llano/ => 'llano' }.freeze
+  HISTORY = File.join(__dir__, '../data/history.json')
+
+  # Keeps every list ever seen. CDFW overwrites most lists each hunt day, so this is the only record of past days.
+  # Tickets are merged by number, since the same list can be posted under two document IDs.
+  def remember(draws)
+    hist = File.exist?(HISTORY) ? JSON.parse(File.read(HISTORY)) : {}
+    draws.each do |d|
+      id = AREA_IDS.find { |re, _| d[:area].to_s =~ re }&.last
+      m = d[:huntDate].to_s.match(%r{(\d+)/(\d+)/(\d+)})
+      next unless id && m && d[:entries].any?
+      date = format('%04d-%02d-%02d', m[3].to_i, m[1].to_i, m[2].to_i)
+      day = (hist[id] ||= {})[date] ||= {}
+      d[:entries].each { |t, _seq, party| day[t.to_s.sub(/\AVDR-0*/, '')] = party }
+    end
+    File.write(HISTORY, JSON.generate(hist))
+    hist.map { |id, days| [id, days.map { |date, t| [date, { tickets: t.size, people: t.values.sum }] }.to_h] }.to_h
+  end
+
   def snapshot
     errors = []
     found = draws(errors)
-    { fetchedAt: Time.now.utc.iso8601, draws: found + butte_basin(found, errors), harvest: harvest(errors), errors: errors }
+    all = found + butte_basin(found, errors)
+    { fetchedAt: Time.now.utc.iso8601, draws: all, history: remember(all), harvest: harvest(errors), errors: errors }
   end
 end

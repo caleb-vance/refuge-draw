@@ -49,6 +49,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
 .chk input{accent-color:var(--accent);width:18px;height:18px;margin:0;flex:none}
 input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #note{position:absolute;z-index:500;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 110px);background:var(--surface);border-radius:8px;padding:7px 11px;font-size:13px;width:max-content;max-width:calc(100vw - 32px)}
+#legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:3px 10px;background:rgba(13,15,17,.86);border-radius:8px;padding:5px 9px;font-size:11px;pointer-events:none}
+#legend div{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.sheet-full #legend{display:none}
+.focused #legend{display:none}
+.wp{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+.pinrow{display:block}
+.daycards{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+.daycards .card{display:flex;flex-direction:column;gap:3px;padding:10px}
+.dayodds{font-weight:800;font-size:20px;line-height:1.15;color:var(--accent)}
+ul.signup{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:14px}
+ul.signup li{background:var(--surface);border-radius:8px;padding:9px 12px}
+ul.signup b{display:block;font-weight:700}
 .pin{width:13px;height:13px;border-radius:50%;background:var(--accent);border:2px solid #0d0f11;box-shadow:0 0 0 1.500px var(--accent)}
 .pin.sel{background:#fff;box-shadow:0 0 0 3px var(--accent)}
 .leaflet-tooltip.pinlabel{background:rgba(13,15,17,.82);border:0;border-radius:5px;color:var(--ink);box-shadow:none;font:500 12px var(--body);padding:1px 6px;display:none}
@@ -77,7 +89,7 @@ nav button[aria-selected="true"]{color:var(--accent);font-weight:700}
 #detail{z-index:5}
 .pad{padding-block:14px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
 .rg{font-size:13px;font-weight:500;color:var(--muted);padding-block:16px 4px;padding-left:max(16px,env(safe-area-inset-left,0px))}
-.row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding-block:11px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
+.row{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding-block:11px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line)}
 .row:hover{background:var(--surface)}
 .row .txt{display:flex;flex-direction:column;min-width:0}
 .row b{font-weight:500;font-size:16px;line-height:1.25}
@@ -135,6 +147,9 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
 @media (min-width:860px){
   #sheet{top:0;bottom:0;left:0;right:auto;width:400px;height:100%;border-radius:0;border-right:1px solid var(--line);transform:none;transition:none}
   #handle{display:none}
+  #legend{left:calc(100% + 12px);right:auto;bottom:12px;width:max-content}
+  .sheet-full #legend{display:flex}
+  .focused #legend{display:none}
   nav button{padding-top:13px}
   #brand{left:414px}
   .sheet-full #top{display:flex}
@@ -161,6 +176,7 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
   </div>
   <div id="note" hidden role="status"></div>
   <div id="sheet">
+    <div id="legend" aria-label="Marker legend"></div>
     <div id="grab">
       <button id="handle" aria-label="Resize panel"><span></span></button>
       <nav role="tablist">
@@ -193,12 +209,41 @@ const STATS_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=247439&inl
 const CLOSURES_URL = 'https://wildlife.ca.gov/Closures';
 const AGENT_URL = 'https://www.ca.wildlifelicense.com/internetsales/OutletSearch/FindOutlet';
 const VAC = {
-  night:{label:'Lottery the night before',dot:'d-night'},
-  morning:{label:'Lottery the morning of',dot:'d-morning'},
-  line:{label:'First-come line',dot:'d-line'},
-  none:{label:'Reservation only',dot:'d-none'},
-  call:{label:'Type B, call the area',dot:'d-call'}
+  night:{label:'Lottery the night before', color:'#19d3ff'},
+  morning:{label:'Lottery the morning of', color:'#ff35b8'},
+  line:{label:'First-come line', color:'#ff8a00'},
+  none:{label:'Reservation only', color:'#ffffff'},
+  call:{label:'Type B, call the area', color:'#b48cff'}
 };
+const DAY_NAME = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+/* Where and when each refuge takes lottery sign-ups, from CDFW's reservation table. */
+const STATION = {sacramento:'the Sacramento NWR check station',delevan:'the Delevan NWR check station',colusa:'the Colusa NWR check station',sutter:'the Sutter NWR check station',
+  howard:'the Howard Slough check station',littledry:'the Little Dry Creek check station',yolo:'Yolo Bypass Headquarters',sanluis:'the Salt Slough/San Luis check station',kesterson:'the Kesterson check station',freitasn:'the Kesterson check station',freitass:'the Salt Slough/San Luis check station',bearcreek:'the Salt Slough/San Luis check station',merced:'the Los Banos check station',saltslough:'the Salt Slough/San Luis check station',gadwall:'the Salt Slough/San Luis check station',china:'the Kesterson check station',losbanos:'the Los Banos check station',volta:'the Los Banos check station',wister:'the Wister check station'};
+const HOURS = {sacramento:'6:00 to 8:00 PM',delevan:'6:00 to 8:00 PM',colusa:'6:00 to 8:00 PM',sutter:'6:00 to 8:00 PM',howard:'6:00 to 8:00 PM',littledry:'6:00 to 8:00 PM',yolo:'4:00 to 7:00 PM',wister:'7:00 to 10:30 PM'};
+function huntDays(r){
+  const hit = (r.harvest || []).map(n => LAST_SEASON[String(n).toUpperCase()]).find(Boolean);
+  if (!hit || !hit.weekdays) return [3, 6, 0];
+  return [3, 6, 0].filter(d => (hit.weekdays[d] || 0) >= 3);
+}
+function signup(r, wd){
+  if (r.vacType !== 'night') return null;
+  const night = DAY_NAME[(wd + 6) % 7], complex = ['sacramento','delevan','colusa','sutter'].includes(r.id);
+  if (wd === 0 && complex) return {night, text:`Saturday before 8:00 PM at ${STATION[r.id]}`};
+  if (wd === 0 && r.id === 'yolo') return {night, text:'Saturday before 7:00 PM at the Yolo Bypass check station'};
+  return {night, text:`${night} night, ${HOURS[r.id] || '6:00 to 9:00 PM'} at ${STATION[r.id]}`};
+}
+/* Odds estimate for one weekday, from the most recent matching hunt with published numbers. */
+function weekdayOdds(r, wd){
+  const days = (DATA.history || {})[r.id] || {};
+  const dates = Object.keys(days).filter(k => fromISO(k).getDay() === wd).sort().reverse();
+  if (!dates.length) return null;
+  const hunters = k => { const d = fromISO(k), key = `${d.getMonth() + 1}/${d.getDate()}`; const row = harvestFor(r).find(x => x.date === key); return row ? row.hunters : null; };
+  const k = dates.find(x => hunters(x) != null) || dates[0], h = hunters(k), put = days[k].people;
+  const out = {date:k, tickets:days[k].tickets, people:put, hunters:h};
+  if (h != null) out.chance = Math.min(1, h / put);
+  return out;
+}
+const oddsText = o => !o || o.chance == null ? '–' : o.chance >= 1 ? 'Room for all' : `1 in ${(1 / o.chance) < 10 ? (1 / o.chance).toFixed(1) : Math.round(1 / o.chance)}`;
 const SPECIES = {CAGO:'Canada goose',ACGO:'Cackling goose',LSGO:'Snow goose',ROGO:"Ross's goose",SCAU:'Scaup',REDH:'Redhead',GOLD:'Goldeneye',MALL:'Mallard',AGWT:'Green-winged teal',NOPI:'Pintail',NSHO:'Shoveler',AMWI:'Wigeon',GADW:'Gadwall',GWFG:'White-fronted goose',CITE:'Cinnamon teal',WODU:'Wood duck',SNGO:'Snow goose',RNDU:'Ring-necked duck',CANG:'Canada goose',BUFF:'Bufflehead',RUDU:'Ruddy duck',LESC:'Lesser scaup'};
 const CA_BOUNDS = [[32.4, -124.5], [42.1, -114.0]];
 /* Which official boundary each refuge fits to: [agency area, optional hunt unit]. */
@@ -270,8 +315,10 @@ function freshText(){
 /* ---------- map ---------- */
 let map, markers = {}, selected = null, filter = 'all', boundsLayer = null, boundaryFeatures = [], activeOverlay = null, activeOverlayMeta = null, overlayOpacity = .85;
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+const pinSvg = (color, size) => `<svg class="wp" width="${size}" height="${Math.round(size * 1.3)}" viewBox="0 0 24 31" aria-hidden="true"><path d="M12 1C5.900 1 1 5.900 1 12c0 8 11 18 11 18s11-10 11-18C23 5.900 18.100 1 12 1z" fill="${color}" stroke="#0d0f11" stroke-width="1.500"/><circle cx="12" cy="12" r="4.200" fill="#0d0f11"/></svg>`;
 function pinIcon(r, sel){
-  return L.divIcon({className:'', iconSize:[13, 13], iconAnchor:[6.5, 6.5], html:`<div class="pin${sel ? ' sel' : ''}"></div>`});
+  const s = sel ? 34 : 24, h = Math.round(s * 1.3);
+  return L.divIcon({className:'', iconSize:[s, h], iconAnchor:[s / 2, h], tooltipAnchor:[s / 2 - 2, -h / 2], html:pinSvg(VAC[r.vacType].color, s)});
 }
 /* Lays a GPS-tagged map image on the map from three known corners, so slight rotation stays true. */
 const CornerOverlay = L.Layer.extend({
@@ -351,6 +398,10 @@ function overlayBounds(o){
   const s = o.clip, h = Math.max(...lats) - Math.min(...lats), w = Math.max(...lngs) - Math.min(...lngs);
   return L.latLngBounds([Math.min(...lats) + h * s[2] / 100, Math.min(...lngs) + w * s[3] / 100], [Math.max(...lats) - h * s[0] / 100, Math.max(...lngs) - w * s[1] / 100]);
 }
+function bindBoundary(f, l){
+  const p = f.properties, s = {closed:'Closed to hunting', open:'Hunt unit. Special regulations apply.', state:'Outer property line, not a hunt zone. Closed zones may sit inside it.'}[p.status];
+  l.bindPopup(`<b>${esc(p.unit)}</b>${esc(p.area)}<br>${esc(s)}<br><span class="quiet">Source: ${esc(p.src)}</span>`);
+}
 const overlaysFor = id => (OVERLAYS || []).filter(o => o.refuge === id);
 function refugeBounds(id){
   const spec = AREA[id];
@@ -388,18 +439,10 @@ function initMap(){
   boundsReady = fetch('boundaries.json').then(r => r.json()).then(g => {
     boundaryFeatures = g.features;
     boundsLayer = L.geoJSON(g, {
-      style: f => {
-        const s = f.properties.status;
-        if (s === 'closed') return {color:'#ff5c4d', weight:1.5, fillColor:'#ff5c4d', fillOpacity:.25};
-        if (s === 'open') return {color:'#7ee081', weight:1.5, fillColor:'#7ee081', fillOpacity:.08};
-        return {color:'#ffffff', weight:1.5, opacity:.8, fill:false};
-      },
-      onEachFeature: (f, l) => {
-        const p = f.properties, s = {closed:'Closed to hunting', open:'Hunt unit. Special regulations apply.', state:'Outer property line, not a hunt zone. Closed zones may sit inside it.'}[p.status];
-        l.bindPopup(`<b>${esc(p.unit)}</b>${esc(p.area)}<br>${esc(s)}<br><span class="quiet">Source: ${esc(p.src)}</span>`);
-      }
+      style: boundaryStyle,
+      onEachFeature: bindBoundary
     });
-    if ($('#l-bounds').checked) boundsLayer.addTo(map);
+    setFocus(selected);
     /* Boundaries are better than hand-placed pins, so move each pin to its unit's center. */
     REFUGES.forEach(r => {
       if (!AREA[r.id] || r.id === 'joice') return;
@@ -415,7 +458,28 @@ const baseLayers = {}; let labelLayers, boundsReady = Promise.resolve();
 function sheetCover(){ return innerWidth >= 860 ? 0 : Math.max(0, innerHeight - $('#sheet').getBoundingClientRect().top); }
 function fitOpts(){
   const wide = innerWidth >= 860;
-  return wide ? {paddingTopLeft:[440, 30], paddingBottomRight:[30, 30]} : {paddingTopLeft:[16, 60], paddingBottomRight:[16, sheetCover() + 16]};
+  return wide ? {paddingTopLeft:[440, 30], paddingBottomRight:[30, 30]} : {paddingTopLeft:[16, 60], paddingBottomRight:[16, sheetCover() + (selected ? 16 : 70)]};
+}
+const boundaryStyle = f => {
+  const s = f.properties.status;
+  if (s === 'closed') return {color:'#ff5c4d', weight:1.5, fillColor:'#ff5c4d', fillOpacity:.25};
+  if (s === 'open') return {color:'#7ee081', weight:1.5, fillColor:'#7ee081', fillOpacity:.08};
+  return {color:'#ffffff', weight:1.5, opacity:.8, fill:false};
+};
+let focusLayer = null;
+/* Selected refuge: its pin and boundary only. No selection: every refuge. */
+function setFocus(id){
+  document.body.classList.toggle('focused', !!id);
+  REFUGES.forEach(r => { const m = markers[r.id]; if (!m || !map) return; if (!id || r.id === id) m.addTo(map); else m.remove(); });
+  if (!map) return;
+  if (focusLayer) { map.removeLayer(focusLayer); focusLayer = null; }
+  const on = $('#l-bounds').checked;
+  if (boundsLayer) { if (id || !on) map.removeLayer(boundsLayer); else boundsLayer.addTo(map); }
+  if (id && on && boundaryFeatures.length) {
+    const spec = AREA[id], area = spec ? spec[0] : MASK[id], unit = spec && spec[1];
+    const fs = boundaryFeatures.filter(f => f.properties.area === area && (!unit || f.properties.unit === unit));
+    if (fs.length) focusLayer = L.geoJSON({type:'FeatureCollection', features:fs}, {style:boundaryStyle, onEachFeature:bindBoundary}).addTo(map);
+  }
 }
 function setOverlay(meta){
   if (activeOverlay) { map.removeLayer(activeOverlay); activeOverlay = null; }
@@ -433,13 +497,6 @@ function focusRefuge(r){
     if (b && b.isValid()) map.fitBounds(b, Object.assign(fitOpts(), {maxZoom:15}));
     else map.setView(markers[r.id].getLatLng(), 12);
   }, 280);
-}
-function applyFilter(){
-  REFUGES.forEach(r => {
-    const m = markers[r.id]; if (!m || !map) return;
-    const show = filter === 'all' || r.vacType === filter;
-    if (show) m.addTo(map); else m.remove();
-  });
 }
 let noteTimer;
 function flash(t){ const n = $('#note'); n.textContent = t; n.hidden = false; clearTimeout(noteTimer); noteTimer = setTimeout(() => { n.hidden = true; }, 5000); }
@@ -500,7 +557,7 @@ function initControls(){
   };
   $('#base-sat').onclick = () => base('sat');
   $('#base-topo').onclick = () => base('topo');
-  $('#l-bounds').onchange = e => { if (map && boundsLayer) { if (e.target.checked) boundsLayer.addTo(map); else map.removeLayer(boundsLayer); } };
+  $('#l-bounds').onchange = () => setFocus(selected);
   $('#l-overlay').onchange = () => setOverlay(activeOverlayMeta);
   $('#l-opacity').oninput = e => { overlayOpacity = e.target.value / 100; if (activeOverlay) activeOverlay.setOpacity(overlayOpacity); };
   let me;
@@ -515,15 +572,25 @@ function initControls(){
 }
 
 /* ---------- list ---------- */
-function renderFilters(){}
+let listDay = (() => { const t = today().getDay(); return [3, 6, 0].sort((x, y) => ((x - t + 7) % 7) - ((y - t + 7) % 7))[0]; })();
 function renderList(){
   const groups = {};
-  REFUGES.filter(r => filter === 'all' || r.vacType === filter).forEach(r => (groups[r.region] = groups[r.region] || []).push(r));
-  $('#list').innerHTML = Object.keys(groups).map(g => `<div class="rg">${esc(g)}</div>` + groups[g].map(r => `
+  REFUGES.forEach(r => (groups[r.region] = groups[r.region] || []).push(r));
+  const stub = r => {
+    if (r.vacType === 'line') return ['Line', 'first come'];
+    if (r.vacType === 'none') return ['–', 'reservation only'];
+    if (r.vacType === 'call') return ['–', 'call the area'];
+    if (!huntDays(r).includes(listDay)) return ['–', `no ${DAY_NAME[listDay].slice(0, 3)} hunts`];
+    const o = weekdayOdds(r, listDay);
+    return !o ? ['–', 'no list online'] : o.chance == null ? [`${o.people}`, 'people put in'] : [oddsText(o), 'lottery odds'];
+  };
+  $('#list').innerHTML = `<div class="pad" style="padding-bottom:0"><div class="seg" id="dayseg">${[[3,'Wednesday'],[6,'Saturday'],[0,'Sunday']].map(([d, n]) => `<button data-day="${d}" aria-pressed="${d === listDay}">${n}</button>`).join('')}</div><p class="quiet">Best-case lottery odds from the last ${DAY_NAME[listDay]} hunt with numbers.</p></div>` + Object.keys(groups).map(g => `<div class="rg">${esc(g)}</div>` + groups[g].map(r => { const [a, b] = stub(r); return `
     <button class="row" data-id="${r.id}">
+      <span class="pinrow">${pinSvg(VAC[r.vacType].color, 18)}</span>
       <span class="txt"><b>${esc(r.name)}</b><small>${esc(VAC[r.vacType].label)}</small></span>
-      <span class="odds">1 in ${r.odds.one < 10 ? r.odds.one : Math.round(r.odds.one)}<span>draw odds</span></span>
-    </button>`).join('')).join('');
+      <span class="odds">${esc(a)}<span>${esc(b)}</span></span>
+    </button>`; }).join('')).join('');
+  $('#dayseg').querySelectorAll('button').forEach(x => { x.onclick = () => { listDay = +x.dataset.day; renderList(); }; });
 }
 
 /* ---------- refuge detail ---------- */
@@ -565,12 +632,13 @@ function renderBirds(){
     .sort((a, b) => (b.s ? b.s.avg : -1) - (a.s ? a.s.avg : -1) || (b.l ? b.l.avg : 0) - (a.l ? a.l.avg : 0));
   $('#birdview').innerHTML = `<div class="pad" style="padding-bottom:6px"><div><h2>Bird averages</h2><p class="quiet">Birds per hunter this season, highest first. Early-season numbers can rest on only a few hunters. Tap a refuge for its species.</p></div></div>` + rows.map(({r, s, l}) => {
     const top = s ? Object.entries(s.species).sort((a, b) => b[1] - a[1])[0] : null;
-    return `<button class="row" data-id="${r.id}" data-birds="1"><span class="txt"><b>${esc(r.name)}</b><small>${top ? esc(SPECIES[top[0]] || top[0]) + ' most often on top' : 'No results yet this season'}</small></span><span class="odds">${s ? s.avg.toFixed(1) : '–'}<span>${l ? 'last yr ' + l.avg.toFixed(1) : 'per hunter'}</span></span></button>`;
+    return `<button class="row" data-id="${r.id}" data-birds="1"><span class="pinrow">${pinSvg(VAC[r.vacType].color, 18)}</span><span class="txt"><b>${esc(r.name)}</b><small>${top ? esc(SPECIES[top[0]] || top[0]) + ' most often on top' : 'No results yet this season'}</small></span><span class="odds">${s ? s.avg.toFixed(1) : '–'}<span>${l ? 'last yr ' + l.avg.toFixed(1) : 'per hunter'}</span></span></button>`;
   }).join('');
 }
 function timeline(r, hunt){
   const t = today();
   const steps = [];
+  if (!huntDays(r).includes(hunt.getDay())) steps.push({d:hunt, title:`Check this date`, body:`Last season's results show no regular ${DAY_NAME[hunt.getDay()]} hunts here. Confirm with the area at ${r.phone}.`});
   const deadline = addDays(hunt, -17), passBy = addDays(hunt, -15), results = addDays(hunt, -7), eve = addDays(hunt, -1);
   const deadlinePast = deadline < t;
   steps.push({d:deadline, key:!deadlinePast, title:deadlinePast ? 'Reservation drawing closed for this date' : 'Last day to apply for a reservation',
@@ -581,7 +649,7 @@ function timeline(r, hunt){
     body:'CDFW posts results at least 7 days before the hunt, and sends email and a letter if you are drawn. Results are in your CDFW account.'});
   let eveBody = 'Check every hunter has their license, photo ID, pass, HIP validation, duck validation and federal duck stamp. Check the closures page and call the area if the weather turned.';
   if (r.vacType === 'night') {
-    steps.push({d:eve, key:true, title:'Enter the lottery', body:`${r.vacancy} Only one person from your party has to be there, and they need a valid GO ID and hunting license. You can enter only one lottery per hunt day.`});
+    steps.push({d:eve, key:true, title:'Enter the lottery', body:`${signup(r, hunt.getDay()) ? 'Enter ' + signup(r, hunt.getDay()).text + '.' : r.vacancy} Only one person from your party has to be there, and they need a valid GO ID and hunting license. You can enter only one lottery per hunt day.`});
     steps.push({d:eve, title:'Pack and verify', body:eveBody});
   } else {
     steps.push({d:eve, title:'Pack and verify', body:eveBody});
@@ -607,6 +675,23 @@ function timeline(r, hunt){
       <div class="when">${esc(fmt(s.d, {month:'short', day:'numeric'}))}<small>${esc(fmt(s.d, {weekday:'long'}))}${s.sub ? '<br>' + esc(s.sub) : ''}</small></div>
       <div class="what"><b>${esc(s.title)}</b>${s.html || esc(s.body)}</div></li>`;
   }).join('');
+}
+function oddsBlock(r){
+  const hd = huntDays(r);
+  const rows = hd.map(wd => {
+    const name = DAY_NAME[wd], s = signup(r, wd);
+    if (r.vacType === 'line') return `<li><b>${name} hunt</b>Join the first-come line that morning at the check station.</li>`;
+    if (r.vacType === 'none' || r.vacType === 'call') return '';
+    if (r.vacType === 'morning') return `<li><b>${name} hunt</b>${esc(r.vacancy)}</li>`;
+    return `<li><b>${name} hunt</b>Enter ${esc(s.text)}.</li>`;
+  }).join('');
+  const odds = r.vacType === 'line' || r.vacType === 'none' || r.vacType === 'call' ? '' : `<section><h3>Lottery odds by hunt day</h3><div class="daycards">${hd.map(wd => {
+    const o = weekdayOdds(r, wd), d = o && fromISO(o.date);
+    return `<div class="card"><div class="kicker">${DAY_NAME[wd]}</div><b class="dayodds">${esc(oddsText(o))}</b><span class="quiet">${!o ? 'No list online yet.' : `${esc(fmt(d, {month:'short', day:'numeric'}))}: ${o.people} people on ${o.tickets} tickets. ` + (o.hunters == null ? 'Hunter count not posted yet.' : `${o.hunters} hunters got on.`)}</span></div>`;
+  }).join('')}</div><p class="quiet">Hunters on the refuge divided by people in that day's lottery. This is a best case, because some of those hunters held reservations. CDFW doesn't publish lottery spots by date.</p></section>`;
+  const list = rows ? `<section><h3>How to get in without a reservation</h3><ul class="signup">${rows}</ul></section>` : (r.vacType === 'call' ? `<section><h3>How to get in without a reservation</h3><p>Call the area at ${esc(r.phone)}.</p></section>` : `<section><h3>How to get in without a reservation</h3><p>${esc(r.vacancy)}</p></section>`);
+  const days = `<p class="quiet">Hunt days seen last season: ${hd.map(d => DAY_NAME[d]).join(', ') || 'check with the area'}.</p>`;
+  return list + days + odds;
 }
 function drawBlock(r){
   const list = drawsFor(r);
@@ -652,12 +737,13 @@ function openDetail(id, keepScroll){
     </div>
     ${!huntMaps.length ? `<p class="quiet">We could not find a dedicated waterfowl hunt map online for this unit, so this is the general area map. Ask the area for the hunt zones.</p>` : ''}
     ${r.note ? `<div class="warn">${esc(r.note)}</div>` : ''}
-    <div class="stats">
-      <div><b>1 in ${r.odds.one}</b><span>Reservation odds</span></div>
+    ${oddsBlock(r)}
+    <section><h3>Reservation drawing</h3><div class="stats">
+      <div><b>1 in ${r.odds.one}</b><span>Season odds</span></div>
       <div><b>${num(r.odds.apps)}</b><span>Applications</span></div>
       <div><b>${num(r.odds.res)}</b><span>Reservations</span></div>
     </div>
-    <p class="quiet">2025-26 regular season, all hunt days combined. CDFW says Saturdays are harder to draw, and Wednesdays and Sundays easier.</p>
+    <p class="quiet">2025-26 regular season, all hunt days combined. CDFW doesn't publish these by date, but says Saturdays are harder to draw, and Wednesdays and Sundays easier.</p></section>
     <section>
       <h3>Your hunt timeline</h3>
       <div><label for="huntdate">Hunt date</label><input type="date" id="huntdate" value="${huntISO}"></div>
@@ -678,6 +764,7 @@ function openDetail(id, keepScroll){
   el.querySelectorAll('[data-pane]').forEach(b => { b.onclick = () => { detailPane = b.dataset.pane; openDetail(id, true); }; });
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
+  setFocus(id);
   if (!keepScroll) focusRefuge(r);
   updateShoot();
   $('#huntdate').onchange = e => { if (e.target.value) { huntISO = e.target.value; openDetail(id, true); } };
@@ -685,7 +772,8 @@ function openDetail(id, keepScroll){
 function closeDetail(){
   $('#detail').hidden = true; selected = null;
   Object.keys(markers).forEach(k => markers[k].setIcon(pinIcon(REFUGES.find(z => z.id === k))));
-  if (map) setOverlay(null);
+  setFocus(null);
+  if (map) { setOverlay(null); map.fitBounds(CA_BOUNDS, fitOpts()); }
   updateShoot();
 }
 
@@ -707,6 +795,7 @@ function renderHow(){
       <li>You can enter only one lottery per hunt day.</li>
       <li>On hunt morning, reservations check in first, then lottery entries in draw order, then any first-come line.</li>
     </ul></section>
+    <section><h3>How the odds work</h3><p>Odds are for the in-person lottery on the same weekday. We take the people who put in on the last matching hunt, then divide the estimated lottery spots by that number. CDFW doesn't publish spots by date, so spots are estimated from the hunters it reported that day. Numbers appear after CDFW posts hunt results, which can lag about a week.</p></section>
     <section><h3>What everyone needs</h3><ul class="plain">
       <li>California hunting license</li>
       <li>Photo ID (junior hunters exempt)</li>
@@ -794,17 +883,17 @@ function setTab(t){
 }
 function renderAll(){
   renderDraws();
+  renderList();
   renderBirds();
   if (selected) openDetail(selected, true);
 }
 document.addEventListener('click', e => {
   const tab = e.target.closest('nav button'); if (tab) { setTab(tab.dataset.tab); return; }
   const row = e.target.closest('.row'); if (row) { detailPane = row.dataset.birds ? 'birds' : 'plan'; setTab('map'); openDetail(row.dataset.id); return; }
-  const chip = e.target.closest('.chip');
-  if (chip) { filter = chip.dataset.f; renderFilters(); renderList(); applyFilter(); }
 });
 
-initSheet(); initControls(); renderFilters(); renderList(); renderHow(); renderAll(); initMap();
+$('#legend').innerHTML = Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
+initSheet(); initControls(); renderList(); renderHow(); renderAll(); initMap();
 
 /* On a server, swap in live data. As a static page this request fails and the built-in copy stays. */
 if (location.protocol.startsWith('http')) {

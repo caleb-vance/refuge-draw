@@ -30,7 +30,7 @@ jobs:
         run: |
           git config user.name "refuge-draw-bot"
           git config user.email "refuge-draw-bot@users.noreply.github.com"
-          git add data/snapshot.json
+          git add data/snapshot.json data/history.json
           git diff --cached --quiet || (git commit -m "Update CDFW data [skip ci]" && git push)
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
