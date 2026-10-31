@@ -53,6 +53,10 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 #legend{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:4px 10px;background:rgba(0,0,0,.92);border-radius:8px;padding:6px 9px;font-size:13px;font-weight:600;color:var(--ink);max-height:40vh;overflow-y:auto}
 #legend div{display:flex;align-items:center;gap:4px;white-space:nowrap}
 .sheet-full #legend{display:none}
+#legendbtn{all:unset;cursor:pointer;flex:0 0 100%;display:flex;justify-content:space-between;align-items:center;font:600 14px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--accent);padding:2px 0}
+#legendbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#legend.closed{left:auto;width:max-content;min-width:130px}
+#legendbtn .chev{font-size:16px;margin-left:12px}
 .fac{display:block;box-sizing:border-box}
 .fac.blind{width:13px;height:13px;margin:1.500px;border-radius:50%;background:#fff;border:3px solid #0d0f11;box-shadow:0 0 0 1px #fff}
 .fac.blind.ada{background:#4da3ff}
@@ -161,7 +165,7 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
 @media (min-width:860px){
   #sheet{top:0;bottom:0;left:0;right:auto;width:400px;height:100%;border-radius:0;border-right:1px solid var(--line);transform:none;transition:none}
   #handle{display:none}
-  #legend{left:calc(100% + 12px);right:auto;bottom:12px;width:max-content}
+  #legend{left:calc(100% + 12px);right:auto;bottom:12px;width:max-content;max-width:520px}
   .sheet-full #legend{display:flex}
   nav button{padding-top:13px}
   #brand{left:414px}
@@ -588,9 +592,15 @@ function insideRefuge(id, ll){
   const b = refugeBounds(id);
   return b && b.isValid() ? b.contains(ll) : map.distance(ll, markers[id].getLatLng()) < 3000;
 }
+let legendOpen = true, legendFor = null;
 function drawLegend(id){
-  $('#legend').innerHTML = id ? keyFor(id).join('') : Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
-  $('#legend').hidden = !$('#legend').innerHTML;
+  if (id !== legendFor) { legendOpen = true; legendFor = id; }
+  const rows = id ? keyFor(id).join('') : Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
+  const box = $('#legend');
+  box.hidden = !rows;
+  box.classList.toggle('closed', !legendOpen);
+  box.innerHTML = `<button id="legendbtn" aria-expanded="${legendOpen}"><span>${id ? 'Map key' : 'Marker key'}</span><span class="chev" aria-hidden="true">${legendOpen ? '▾' : '▴'}</span></button>${legendOpen ? rows : ''}`;
+  $('#legendbtn').onclick = () => { legendOpen = !legendOpen; drawLegend(id); };
 }
 let focusLayer = null;
 /* Selected refuge: its pin and boundary only. No selection: every refuge. */
@@ -906,7 +916,7 @@ function closeDetail(){
   setTab(document.querySelector('nav button[aria-selected="true"]').dataset.tab);
   Object.keys(markers).forEach(k => markers[k].setIcon(pinIcon(REFUGES.find(z => z.id === k))));
   setFocus(null);
-  if (map) { setOverlay(null); map.fitBounds(CA_BOUNDS, fitOpts()); }
+  if (map) setOverlay(null);
   updateShoot();
 }
 
