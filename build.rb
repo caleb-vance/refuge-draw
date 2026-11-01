@@ -41,5 +41,6 @@ head = '<!doctype html><html lang="en"><head><meta charset="utf-8">' \
        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>'
 File.write(File.join(site, 'index.html'), head + html)
 FileUtils.cp(File.join(ROOT, 'public/boundaries.json'), site)
+FileUtils.cp(SNAP, File.join(site, 'snapshot.json'))
 FileUtils.cp(File.join(ROOT, 'public/facilities.json'), site)
 FileUtils.cp_r(File.join(ROOT, 'public/overlays'), site)

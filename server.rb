@@ -32,7 +32,7 @@ end
 
 server = WEBrick::HTTPServer.new(Port: PORT, BindAddress: '0.0.0.0', AccessLog: [], Logger: WEBrick::Log.new($stderr, WEBrick::Log::WARN))
 
-server.mount_proc('/api/live') do |_req, res|
+server.mount_proc('/snapshot.json') do |_req, res|
   res['Content-Type'] = 'application/json'
   res['Cache-Control'] = 'no-store'
   res.body = live_json

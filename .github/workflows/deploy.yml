@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '*/30 * * * *'
+    # Draw results post around 8 PM Pacific. These UTC hours cover 8 PM in both PDT and PST,
+    # and the gate job below drops the runs outside that hour.
+    - cron: '2-59/5 3-4 * * *'
 
 permissions:
   contents: write
@@ -17,7 +20,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ github.event.schedule }}" = "2-59/5 3-4 * * *" ] && [ "$(TZ=America/Los_Angeles date +%H)" != "20" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   publish:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,16 +46,19 @@ jobs:
         run: ruby build.rb
       - name: Save the latest data
         run: |
-          git config user.name "refuge-draw-bot"
-          git config user.email "refuge-draw-bot@users.noreply.github.com"
-          git add data/snapshot.json data/history.json
-          if ! git diff --cached --quiet; then
+          # The pull time changes every run, so only save when the draw history has changed.
+          if ! git diff --quiet -- data/history.json; then
+            git config user.name "refuge-draw-bot"
+            git config user.email "refuge-draw-bot@users.noreply.github.com"
+            git add data/snapshot.json data/history.json
             git commit -m "Update CDFW data [skip ci]"
             # Another publish can land during the build, so sync and retry before giving up.
+            git stash --include-untracked --quiet || true
             for try in 1 2 3; do
               git pull --rebase -X theirs origin main && git push && break
               sleep 10
             done
+            git stash pop --quiet || true
           fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

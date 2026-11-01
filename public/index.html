@@ -1860,7 +1860,7 @@ function renderDraws(){
   const h = (DATA.harvest || {}).files || [];
   const prior = $('#ticket') ? $('#ticket').value : '';
   $('#drawview').innerHTML = `<div class="pad">
-    <div><div class="kicker">In-person vacancy draws</div><h2>Find your ticket</h2><p class="quiet">${esc(freshText())}</p></div>
+    <div><div class="kicker">In-person vacancy draws</div><h2>Find your ticket</h2><p class="quiet"><span id="fresh">${esc(freshText())}</span>. Checked about every 5 minutes from 8 to 9 PM Pacific.</p></div>
     <form id="tform"><label for="ticket">Ticket number</label><input class="mono" type="text" id="ticket" inputmode="numeric" autocomplete="off" placeholder="VDR-0000014833" value="${esc(prior)}"></form>
     <div id="hit" class="card" hidden aria-live="polite"></div>
     <section><h3>Latest lists</h3>
@@ -1923,11 +1923,24 @@ document.addEventListener('click', e => {
 drawLegend(null);
 initSheet(); initControls(); renderList(); renderHow(); renderAll(); initMap();
 
-/* On a server, swap in live data. As a static page this request fails and the built-in copy stays. */
-if (location.protocol.startsWith('http')) {
-  fetch('/api/live', {cache:'no-store'}).then(r => {
-    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) throw 0;
-    return r.json();
-  }).then(d => { if (d && d.draws && d.draws.length) { DATA = d; renderAll(); } }).catch(() => {});
+/* Pick up newer data without a refresh: every 2 minutes from 8 to 9:15 PM Pacific, when draw results post, and every 15 otherwise. */
+function drawHour(){
+  const [h, m] = new Date().toLocaleTimeString('en-GB', {timeZone:'America/Los_Angeles'}).split(':').map(Number);
+  return h === 20 || (h === 21 && m <= 15);
 }
+async function refreshData(){
+  try {
+    const res = await fetch(`snapshot.json?v=${Date.now()}`, {cache:'no-store'});
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!d.draws || !d.draws.length || !d.fetchedAt || Date.parse(d.fetchedAt) <= Date.parse(DATA.fetchedAt)) return;
+    const changed = JSON.stringify(d.draws) !== JSON.stringify(DATA.draws);
+    DATA = d;
+    if (changed) { renderAll(); renderList(); } else { const f = $('#fresh'); if (f) f.textContent = freshText(); }
+  } catch (e) {}
+}
+function scheduleRefresh(){
+  setTimeout(() => { refreshData().finally(scheduleRefresh); }, drawHour() ? 12e4 : 9e5);
+}
+if (location.protocol.startsWith('http')) { refreshData(); scheduleRefresh(); }
 </script>
