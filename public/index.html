@@ -1577,7 +1577,12 @@ function weatherHtml(r, ll, wx, nwsLink){
 const CDFW_DOC = n => `https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=${n}&inline`;
 const FWS_FLOOD = f => `https://www.fws.gov/sites/default/files/documents/2026-10/${f}.pdf`;
 const KF = {label:'Kesterson and Freitas units', img:'overlays/flood-kesterson-freitas.jpg', pdf:FWS_FLOOD('kesterson-freitas-unit-floodup-2026')};
+const UBB_ALL = {label:'All of Upper Butte Basin', year:2020, img:'overlays/flood183128.jpg', pdf:CDFW_DOC(183128)};
 const FLOOD = {
+  llano:[{label:'Llano Seco Unit', year:2020, img:'overlays/flood183129.jpg', pdf:CDFW_DOC(183129)}, UBB_ALL],
+  howard:[{label:'Howard Slough Unit', year:2020, img:'overlays/flood183130.jpg', pdf:CDFW_DOC(183130)}, UBB_ALL],
+  littledry:[{label:'Little Dry Creek Unit', year:2020, img:'overlays/flood183131.jpg', pdf:CDFW_DOC(183131)}, UBB_ALL],
+  mendota:[{label:'Mendota', year:'2021-22', img:'overlays/flood133097.jpg', pdf:CDFW_DOC(133097)}],
   losbanos:[{label:'Los Banos', img:'overlays/flood88660.png', pdf:CDFW_DOC(88660)}, {label:'Mud Slough Unit', img:'overlays/flood88662.png', pdf:CDFW_DOC(88662)}],
   saltslough:[{label:'Salt Slough Unit', img:'overlays/flood88659.png', pdf:CDFW_DOC(88659)}],
   gadwall:[{label:'Gadwall Unit', img:'overlays/flood88658.png', pdf:CDFW_DOC(88658)}],
@@ -1592,9 +1597,9 @@ function floodPage(r){
   const maps = FLOOD[r.id];
   if (!maps) {
     const check = ['sacramento','delevan','colusa','sutter'].includes(r.id);
-    return `<section><h3>Planned flood map</h3><p>${check ? 'USFWS says flood-up maps for this refuge are only available in person at the hunter check station.' : `We couldn't find a flood map for this refuge online. Call ${esc(r.phone)} or ask at the check station.`}</p></section>`;
+    return `<section><h3>Planned flood map</h3><p>${check ? 'USFWS says flood-up maps for this refuge are only available in person at the hunter check station.' : `We haven't found a flood map for this refuge online. Call ${esc(r.phone)} or ask at the check station.`}</p></section>`;
   }
-  return `<section><h3>Planned flood maps</h3><p class="quiet">Official 2026 plans. Tap a map to zoom in. Schedules can change with water and weather, so confirm with the refuge.</p></section>` + maps.map(m => `<section><div class="kicker">${esc(m.label)}</div><button class="floodimg" data-fimg="${esc(m.img)}" data-flabel="${esc(m.label)} flood map"><img src="${esc(m.img)}" alt="${esc(m.label)} 2026 flood map" loading="lazy"></button><div class="btns">${link(m.pdf, 'Official PDF', 'btn')}</div></section>`).join('');
+  return `<section><h3>Planned flood maps</h3>${maps.some(m => m.year) ? `<div class="warn">The newest plan we can find online is from ${esc(maps[0].year)}, so this year's flooding may be different.</div>` : ''}<p class="quiet">${maps.some(m => m.year) ? 'Official plan from an earlier year.' : 'Official 2026 plans.'} Tap a map to zoom in. Schedules can change with water and weather, so confirm with the refuge.</p></section>` + maps.map(m => `<section><div class="kicker">${esc(m.label)}</div><button class="floodimg" data-fimg="${esc(m.img)}" data-flabel="${esc(m.label)} flood map"><img src="${esc(m.img)}" alt="${esc(m.label)} 2026 flood map" loading="lazy"></button><div class="btns">${link(m.pdf, 'Official PDF', 'btn')}</div></section>`).join('');
 }
 function birdPage(r){
   return birdSummary(r) + blindSection(r);
