@@ -1419,6 +1419,13 @@ function initSheet(){
 }
 function initControls(){
   $('#layerbtn').onclick = () => { const p = $('#layers'); p.hidden = !p.hidden; $('#layerbtn').setAttribute('aria-expanded', !p.hidden); };
+  /* Tapping anywhere else closes the layers panel, without also leaving the refuge. */
+  document.addEventListener('pointerdown', e => {
+    const p = $('#layers');
+    if (p.hidden || e.target.closest('#layers,#layerbtn')) return;
+    p.hidden = true; $('#layerbtn').setAttribute('aria-expanded', false);
+    if (e.target.closest('#map')) holdSuppress = Date.now() + 600;
+  }, true);
   const base = k => {
     if (!map) return;
     Object.entries(baseLayers).forEach(([n, l]) => { if (n === k) l.addTo(map); else map.removeLayer(l); });
