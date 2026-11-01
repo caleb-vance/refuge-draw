@@ -128,6 +128,12 @@ section{display:flex;flex-direction:column;gap:9px;min-width:0}
 .warn{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 12px;font-size:14px}
 .quiet{color:var(--muted);font-size:14px;margin:0}
 .big{font:700 54px var(--display);line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.wx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
+.wx svg{width:64px;height:64px;color:var(--accent)}
+.wx .big{font-size:44px}
+.wx .big small{font:600 18px var(--body);color:var(--ink)}
+.dir{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.dir svg{width:14px;height:14px;color:var(--accent);flex:none}
 .bars{display:flex;flex-direction:column;gap:6px}
 .bar{display:grid;grid-template-columns:44px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:13px;font-variant-numeric:tabular-nums}
 .bar i{display:block;height:10px;border-radius:3px;background:var(--speculum);min-width:2px}
@@ -786,6 +792,119 @@ function blindSection(r){
     ${body}
     <p class="quiet">Regular season only. A blind with few hunters can show a very high average. ${link(s.url, 'Official USFWS PDF')}</p></section>`;
 }
+/* Weather comes straight from the National Weather Service, which needs no key. */
+let weatherDay = null, wxCache = {};
+const LA = 'America/Los_Angeles';
+const COMPASS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const compass = d => COMPASS[Math.round(d / 22.5) % 16];
+const laDate = ms => new Date(ms).toLocaleDateString('en-CA', {timeZone:LA});
+const hourLabel = ms => new Date(ms).toLocaleTimeString('en-US', {hour:'numeric', timeZone:LA});
+function durationMs(s){
+  const m = s.match(/P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/) || [];
+  return ((+m[1] || 0) * 24 * 60 + (+m[2] || 0) * 60 + (+m[3] || 0)) * 6e4;
+}
+function series(p, key){
+  return ((p[key] || {}).values || []).map(v => {
+    const [t, d] = v.validTime.split('/'), from = Date.parse(t);
+    return {from, to:from + durationMs(d), value:v.value};
+  });
+}
+const valueAt = (s, ms) => { const hit = s.find(v => ms >= v.from && ms < v.to); return hit ? hit.value : null; };
+const toMph = v => v == null ? null : Math.round(v * 0.621371);
+const toF = v => v == null ? null : Math.round(v * 9 / 5 + 32);
+function visText(m){
+  if (m == null) return 'Not forecast';
+  const mi = m / 1609.34;
+  return mi >= 10 ? '10+ mi' : `${mi < 1 ? mi.toFixed(2).replace(/0$/, '') : mi.toFixed(mi < 3 ? 1 : 0)} mi`;
+}
+const skyText = p => p == null ? 'Sky not forecast' : p < 15 ? 'Clear' : p < 40 ? 'Mostly clear' : p < 65 ? 'Partly cloudy' : p < 88 ? 'Mostly cloudy' : 'Cloudy';
+/* The arrow points the way the wind is blowing, so a north wind points down. */
+const windArrow = d => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="transform:rotate(${(d + 180) % 360}deg)"><path d="M12 2 20 21 12 16.500 4 21Z"/></svg>`;
+async function getJSON(url){
+  const res = await fetch(url, {headers:{Accept:'application/geo+json'}});
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+async function loadWeather(key, lat, lng){
+  const hit = wxCache[key];
+  if (hit && Date.now() - hit.at < 15 * 6e4) return hit;
+  const point = (await getJSON(`https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`)).properties;
+  const grid = (await getJSON(point.forecastGridData)).properties;
+  let now = null;
+  try {
+    const stations = (await getJSON(point.observationStations)).features.slice(0, 3);
+    for (const st of stations) {
+      const ob = (await getJSON(`${st.id}/observations/latest`)).properties;
+      if (ob.windSpeed && ob.windSpeed.value != null && Date.now() - Date.parse(ob.timestamp) < 3 * 36e5) { now = {name:st.properties.name, ob}; break; }
+    }
+  } catch (e) {}
+  return (wxCache[key] = {at:Date.now(), grid, now});
+}
+async function showWeather(r, retry){
+  const box = $('#pane-weather'); if (!box) return;
+  const ll = markers[r.id] ? markers[r.id].getLatLng() : {lat:r.lat, lng:r.lng};
+  if (retry) delete wxCache[r.id];
+  if (!wxCache[r.id] || Date.now() - wxCache[r.id].at >= 15 * 6e4) box.innerHTML = '<p class="quiet">Loading the forecast…</p>';
+  const nwsLink = `https://forecast.weather.gov/MapClick.php?lat=${ll.lat.toFixed(4)}&lon=${ll.lng.toFixed(4)}`;
+  try {
+    const wx = await loadWeather(r.id, ll.lat, ll.lng);
+    if (selected !== r.id || detailPane !== 'weather') return;
+    const live = $('#pane-weather'); if (live) { live.innerHTML = weatherHtml(r, ll, wx, nwsLink); bindWeather(r); }
+  } catch (e) {
+    if (selected !== r.id || detailPane !== 'weather') return;
+    const live = $('#pane-weather'); if (!live) return;
+    live.innerHTML = `<div class="warn">The National Weather Service forecast didn't load. Check your signal and try again.</div><div class="btns"><button class="btn main" id="wxretry">Try again</button>${link(nwsLink, 'Open weather.gov', 'btn')}</div>`;
+    $('#wxretry').onclick = () => showWeather(r, true);
+  }
+}
+function bindWeather(r){
+  const s = $('#wxday'); if (s) s.onchange = () => { weatherDay = s.value; showWeather(r); };
+}
+function weatherHtml(r, ll, wx, nwsLink){
+  const p = wx.grid, wind = series(p, 'windSpeed'), dir = series(p, 'windDirection'), gust = series(p, 'windGust'), vis = series(p, 'visibility'),
+    sky = series(p, 'skyCover'), rain = series(p, 'probabilityOfPrecipitation'), temp = series(p, 'temperature'), wxs = series(p, 'weather');
+  const last = wind.length ? wind[wind.length - 1].to : Date.now();
+  const days = [];
+  for (let d = today(), i = 0; i < 8; i++, d = addDays(d, 1)) if (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) + 18 * 36e5 < last) days.push(toISO(d));
+  const wanted = weatherDay || huntISO;
+  const day = days.includes(wanted) ? wanted : days[0];
+  const far = !weatherDay && !days.includes(huntISO) && fromISO(huntISO) > today();
+  const date = fromISO(day);
+  const shoot = roundTo5(sunriseUTC(date, ll.lat, ll.lng) - 30 * 6e4), end = sunsetUTC(date, ll.lat, ll.lng);
+  const hour = ms => Math.floor(ms / 36e5) * 36e5;
+  const nowH = hour(Date.now()), past = shoot < nowH;
+  const start = Math.max(hour(shoot), nowH);
+  const hours = [];
+  for (let t = start; t <= end; t += 36e5) hours.push(t);
+  const dayHours = [];
+  for (let t = hour(Date.parse(`${day}T12:00:00Z`)) - 12 * 36e5; t < hour(Date.parse(`${day}T12:00:00Z`)) + 18 * 36e5; t += 36e5) if (laDate(t) === day) dayHours.push(t);
+  const w0 = valueAt(wind, start), d0 = valueAt(dir, start), g0 = valueAt(gust, start), v0 = valueAt(vis, start);
+  const temps = dayHours.map(t => valueAt(temp, t)).filter(v => v != null);
+  const skies = dayHours.map(t => valueAt(sky, t)).filter(v => v != null);
+  const rains = dayHours.map(t => valueAt(rain, t)).filter(v => v != null);
+  const kinds = new Set(), fog = new Set();
+  dayHours.forEach(t => (valueAt(wxs, t) || []).forEach(x => { if (x && x.weather) { const n = x.weather.replace(/_/g, ' '); kinds.add(n); if (/fog|mist|haze|smoke/.test(n)) fog.add(n); } }));
+  const dirCell = d => d == null ? '–' : `<span class="dir">${windArrow(d)}${compass(d)}</span>`;
+  let current = '';
+  if (wx.now) {
+    const o = wx.now.ob, at = new Date(o.timestamp).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:LA});
+    current = `<section><h3>Right now</h3><div class="stats"><div><b>${toMph(o.windSpeed.value)} mph</b><span>Wind${o.windDirection && o.windDirection.value != null ? ' from ' + compass(o.windDirection.value) : ''}</span></div><div><b>${o.windGust && o.windGust.value != null ? toMph(o.windGust.value) + ' mph' : '–'}</b><span>Gusts</span></div><div><b>${o.visibility && o.visibility.value != null ? visText(o.visibility.value) : '–'}</b><span>Visibility</span></div></div><p class="quiet">${esc(wx.now.name)} station, ${esc(at)}. This station may be miles from the refuge.</p></section>`;
+  }
+  const updated = p.updateTime ? new Date(p.updateTime).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit', timeZone:LA}) : null;
+  return `<div><label for="wxday">Forecast day</label><select id="wxday">${days.map(d => `<option value="${d}"${d === day ? ' selected' : ''}>${esc(fmt(fromISO(d), {weekday:'long', month:'short', day:'numeric'}))}</option>`).join('')}</select></div>
+    ${far ? `<p class="quiet">Your hunt date, ${esc(fmt(fromISO(huntISO)))}, is past the forecast range, so this shows the first available day.</p>` : ''}
+    ${fog.size ? `<div class="warn">Low visibility possible: ${esc([...fog].join(', '))} in the forecast.</div>` : ''}
+    <section><div class="kicker">${past ? 'This hour' : `At shoot time, about ${esc(clock(shoot))}`}</div>
+      <div class="wx">${d0 == null ? '' : windArrow(d0)}<div><div class="big">${w0 == null ? '–' : toMph(w0)} <small>mph${d0 == null ? '' : ' from ' + compass(d0)}</small></div></div></div>
+      <div class="stats"><div><b>${g0 == null ? '–' : toMph(g0) + ' mph'}</b><span>Gusts</span></div><div><b>${esc(visText(v0))}</b><span>Visibility</span></div><div><b>${temps.length ? toF(valueAt(temp, start)) + '°' : '–'}</b><span>Temperature</span></div></div>
+    </section>
+    <section><h3>Wind and visibility by hour</h3><div class="card scroll"><table><thead><tr><th>Time</th><th class="n">Wind</th><th class="n">Gust</th><th>From</th><th>Vis.</th><th class="n">Rain</th></tr></thead><tbody>${hours.map(t => { const w = valueAt(wind, t), g = valueAt(gust, t), rn = valueAt(rain, t); return `<tr><td>${esc(hourLabel(t))}</td><td class="n">${w == null ? '–' : toMph(w)}</td><td class="n">${g == null ? '–' : toMph(g)}</td><td>${dirCell(valueAt(dir, t))}</td><td>${esc(visText(valueAt(vis, t)).replace('Not forecast', '–'))}</td><td class="n">${rn == null ? '–' : rn + '%'}</td></tr>`; }).join('')}</tbody></table></div>
+    <p class="quiet">Wind and gusts in mph. "From" is the direction the wind comes from, and the arrow shows where it's blowing. NWS usually forecasts visibility only a day or two out, and it can miss local fog.</p></section>
+    <section><h3>General forecast</h3><div class="stats"><div><b>${temps.length ? `${toF(Math.max(...temps))}° / ${toF(Math.min(...temps))}°` : '–'}</b><span>High / low</span></div><div><b>${rains.length ? Math.max(...rains) + '%' : '–'}</b><span>Rain chance</span></div><div><b>${esc(skyText(skies.length ? skies.reduce((x, y) => x + y, 0) / skies.length : null))}</b><span>Sky</span></div></div>
+    ${kinds.size ? `<p>Expected: ${esc([...kinds].join(', '))}.</p>` : ''}</section>
+    ${current}
+    <p class="quiet">Forecast for the area around this refuge's pin${updated ? `, updated ${esc(updated)}` : ''}. Wind on the marsh can differ. Source: ${link(nwsLink, 'National Weather Service')}. Refuge Rat is not endorsed by NWS.</p>`;
+}
 function birdPage(r){
   return birdSummary(r) + blindSection(r);
 }
@@ -903,7 +1022,8 @@ function openDetail(id, keepScroll){
   el.innerHTML = `<div class="pad">
     <div><button class="back" id="back">← All refuges</button><p class="quiet">Or tap the map outside this area.</p></div>
     <div><div class="kicker">${esc(r.region)} · Type ${r.kind} area</div><h2>${esc(r.name)}</h2></div>
-    <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button></div>
+    <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button><button data-pane="weather" aria-pressed="${detailPane === 'weather'}">Weather</button></div>
+    <div id="pane-weather" class="pad" style="padding:0" ${detailPane === 'weather' ? '' : 'hidden'}><p class="quiet">Loading the forecast…</p></div>
     <div id="pane-birds" class="pad" style="padding:0" ${detailPane === 'birds' ? '' : 'hidden'}>${birdPage(r)}</div>
     <div id="pane-plan" class="pad" style="padding:0" ${detailPane === 'plan' ? '' : 'hidden'}>
     ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><button class="btn" id="fullkey">See full map and its key</button><p class="quiet">${ovs[0].approx ? 'This PDF has no GPS data, so we lined it up by hand with the official boundary. Use it as a guide, and trust field signs and the PDF.' : "Placed from the PDF's GPS data and cut to the official boundary."} The full map shows the area types and symbols this refuge uses.</p></section>` : FULL_MAP[r.id] ? `<section><div class="warn">${esc(FULL_MAP[r.id].note)}</div><div class="btns"><button class="btn main" id="fullkey">See full map and its key</button></div></section>` : `<div class="warn">The hunt map PDF has no GPS data, so it isn't laid on the imagery. ${focusedFacilities(r.id).length ? 'Official blind and parking points are shown instead. Numbered ponds and zones are in the PDF.' : 'The official boundary is drawn instead. Zones are in the PDF.'}</div>`}
@@ -947,9 +1067,10 @@ function openDetail(id, keepScroll){
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
   setFocus(id);
+  if (detailPane === 'weather') showWeather(r);
   if (!keepScroll) focusRefuge(r);
   updateShoot();
-  $('#huntdate').onchange = e => { if (e.target.value) { huntISO = e.target.value; openDetail(id, true); } };
+  $('#huntdate').onchange = e => { if (e.target.value) { huntISO = e.target.value; weatherDay = null; openDetail(id, true); } };
 }
 function closeDetail(){
   $('#detail').hidden = true; selected = null;
