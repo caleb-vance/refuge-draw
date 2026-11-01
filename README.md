@@ -17,3 +17,5 @@ Hosting: `.github/workflows/deploy.yml` publishes `site/` to GitHub Pages and re
 Blind results: `ruby tools/blinds.rb` reads USFWS blind-by-blind PDFs into `public/blinds.json`. Rerun it and add new file names when USFWS posts a newer season.
 
 Draw night: the workflow is scheduled every 5 minutes from 8 to 9 PM Pacific, but GitHub can delay or skip these runs, and open pages check `snapshot.json` every 2 minutes in that window.
+
+Hunt log: stored in the browser's localStorage under `refugerat.hunts.v1`, with backup and restore as a JSON file.

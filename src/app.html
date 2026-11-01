@@ -102,8 +102,8 @@ ul.signup b{display:block;font-weight:700}
 #grab{flex:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;border-bottom:1px solid var(--line)}
 #handle{width:100%;padding:9px 0 4px;display:block;background:none;border:0;cursor:grab}
 #handle span{display:block;width:36px;height:4px;margin:auto;border-radius:2px;background:var(--line)}
-nav{display:grid;grid-template-columns:repeat(4,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-nav button{all:unset;cursor:pointer;text-align:center;padding:7px 2px 11px;font:500 16px var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+nav{display:grid;grid-template-columns:repeat(5,1fr);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav button{all:unset;cursor:pointer;text-align:center;padding:7px 2px 11px;font:500 15px var(--display);letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
 nav button[aria-selected="true"]{color:var(--accent);font-weight:700;box-shadow:inset 0 -3px 0 var(--speculum)}
 #body{flex:1;min-height:0;position:relative;padding-bottom:env(safe-area-inset-bottom,0px)}
 .view{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--bg)}
@@ -151,6 +151,20 @@ details.sec[open]{outline:1px solid var(--accent)}
 .sec-b,.inner-col{display:flex;flex-direction:column;gap:14px;min-width:0}
 .sec-b{padding:2px 13px 16px}
 .sec-b .card,.sec-b details,.sec-b .stats div,.sec-b ul.signup li{background:var(--raised)}
+#dropbar{position:absolute;z-index:950;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 128px);display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(0,0,0,.92);border:1px solid var(--accent);border-radius:10px;padding:8px 8px 8px 12px;font-weight:700}
+body.dropping .leaflet-marker-pane *,body.dropping .leaflet-tooltip-pane *,body.dropping .leaflet-overlay-pane *{pointer-events:none!important}
+body.dropping #map,body.dropping .leaflet-grab{cursor:crosshair}
+.logpin{width:22px;height:22px;border-radius:50%;background:var(--red);border:3px solid #fff;box-shadow:0 0 0 2px #000,0 1px 6px #000}
+.stps{display:flex;flex-direction:column}
+.stp{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-block:5px;border-bottom:1px solid var(--line)}
+.stp div{display:flex;align-items:center;gap:6px}
+.stp b{min-width:30px;text-align:center;font:700 19px var(--display)}
+.stp .tool{background:var(--raised);font-size:22px;font-weight:700;width:40px;height:40px}
+.wxf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.wxf select,.wxf input{max-width:none}
+textarea{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;resize:vertical}
+details.hunt>summary{align-items:center}
+.logn{white-space:pre-wrap;overflow-wrap:anywhere}
 .wx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .wx svg{width:64px;height:64px;color:var(--accent)}
 .wx .big{font-size:44px}
@@ -223,6 +237,7 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
     </div>
   </div>
   <div id="viewer" hidden role="dialog" aria-label="Full hunt map"></div>
+  <div id="dropbar" hidden role="status"><span>Tap the map where you hunted</span><button class="btn" id="dropcancel">Cancel</button></div>
   <div id="note" hidden role="status"></div>
   <div id="sheet">
     <div id="legend" aria-label="Marker legend"></div>
@@ -232,12 +247,14 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
         <button role="tab" data-tab="map" aria-selected="true">Refuges</button>
         <button role="tab" data-tab="birds" aria-selected="false">Birds</button>
         <button role="tab" data-tab="draw" aria-selected="false">Draws</button>
+        <button role="tab" data-tab="log" aria-selected="false">Log</button>
         <button role="tab" data-tab="how" aria-selected="false">Guide</button>
       </nav>
     </div>
     <div id="body">
       <div class="view" id="mapview"><div id="list"></div></div>
       <div class="view" id="birdview" hidden></div>
+      <div class="view" id="logview" hidden></div>
       <div class="view" id="howview" hidden></div>
       <div class="view" id="drawview" hidden></div>
       <div class="view" id="detail" hidden></div>
@@ -489,7 +506,7 @@ function initMap(){
   });
   const labels = () => $('#map').classList.toggle('show-labels', map.getZoom() >= 9);
   map.on('zoomend', labels); labels();
-  map.on('click', e => { if (selected && !insideRefuge(selected, e.latlng)) { closeDetail(); setTab('map'); } });
+  map.on('click', e => { if (dropping) { placeWaypoint(e.latlng); return; } if (selected && !insideRefuge(selected, e.latlng)) { closeDetail(); setTab('map'); } });
   map.on('moveend', updateShoot); updateShoot();
   setInterval(updateShoot, 60000);
   new ResizeObserver(() => map.invalidateSize()).observe($('#map'));
@@ -1388,6 +1405,208 @@ function findTicket(raw){
     : `No match in the lists we have. Check the number, or look at the check station, since some refuges do not post online.`;
 }
 
+/* ---------- hunt log: saved only in this browser, never uploaded ---------- */
+const LOG_KEY = 'refugerat.hunts.v1';
+const DUCK_LIST = ['Mallard','Gadwall','Wigeon','Green-winged teal','Cinnamon teal','Blue-winged teal','Pintail','Shoveler','Wood duck','Ring-necked duck','Scaup','Canvasback','Redhead','Bufflehead','Goldeneye','Ruddy duck','Other duck'];
+const GOOSE_LIST = ['Snow goose',"Ross's goose",'White-fronted goose','Canada goose','Cackling goose','Other goose'];
+let dropping = false, draft = null, logPins = null, draftPin = null, logStoreOK = true, wxToken = 0, logMsg = '', confirmDelete = null;
+function loadHunts(){
+  try { logStoreOK = true; return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch (e) { logStoreOK = false; return []; }
+}
+function storeHunts(list){
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(list)); logStoreOK = true; return true; } catch (e) { logStoreOK = false; return false; }
+}
+const birdTotal = h => Object.values(h.birds || {}).reduce((t, n) => t + n, 0);
+const refugeName = id => (REFUGES.find(r => r.id === id) || {name:'Unknown refuge'}).name;
+function newDraft(){
+  return {id:null, refuge:selected || (loadHunts()[0] || {}).refuge || REFUGES[0].id, date:toISO(today()), notes:'', birds:{}, spot:null, wx:{}, wxNote:''};
+}
+function wxSummary(w){
+  const p = [];
+  if (w.wind !== '' && w.wind != null) p.push(`Wind ${w.wind} mph${w.dir ? ' from ' + w.dir : ''}`);
+  if (w.gust !== '' && w.gust != null) p.push(`gusts ${w.gust}`);
+  if (w.vis) p.push(`visibility ${w.vis}`);
+  if (w.temp !== '' && w.temp != null) p.push(`${w.temp}°`);
+  if (w.sky) p.push(w.sky);
+  return p.join(', ');
+}
+function huntCard(h){
+  const total = birdTotal(h), sp = Object.entries(h.birds || {}).filter(x => x[1] > 0).map(([n, c]) => `${c} ${n}`).join(', ');
+  return `<details class="hunt"><summary><div class="sec-t"><b>${esc(refugeName(h.refuge))}</b><small>${esc(fmt(fromISO(h.date), {weekday:'short', month:'short', day:'numeric', year:'numeric'}))}</small></div><span class="odds">${total}<span>${total === 1 ? 'bird' : 'birds'}</span></span></summary><div class="inner">
+    <p><b>Birds:</b> ${sp ? esc(sp) : 'None logged'}</p>
+    <p><b>Weather:</b> ${esc(wxSummary(h.wx || {}) || 'Not saved')}${h.wx && h.wx.source ? `<br><span class="quiet">${esc(h.wx.source)}</span>` : ''}</p>
+    <p><b>Waypoint:</b> ${h.spot ? `${h.spot[0].toFixed(5)}, ${h.spot[1].toFixed(5)}` : 'None dropped'}</p>
+    ${h.notes ? `<p class="logn"><b>Notes:</b> ${esc(h.notes)}</p>` : ''}
+    <div class="btns">${h.spot ? `<button class="btn" data-lshow="${h.id}">Show on map</button>` : ''}<button class="btn" data-ledit="${h.id}">Edit</button><button class="btn" data-ldel="${h.id}">${confirmDelete === h.id ? 'Tap again to delete' : 'Delete'}</button></div>
+  </div></details>`;
+}
+function stepper(n){
+  const c = (draft.birds || {})[n] || 0;
+  return `<div class="stp"><span>${esc(n)}</span><div><button type="button" class="tool" data-minus="${esc(n)}" aria-label="One fewer ${esc(n)}">−</button><b data-count="${esc(n)}">${c}</b><button type="button" class="tool" data-plus="${esc(n)}" aria-label="One more ${esc(n)}">+</button></div></div>`;
+}
+function renderLog(){
+  const box = $('#logview'); if (!box) return;
+  const hunts = loadHunts().sort((x, y) => y.date.localeCompare(x.date));
+  const total = hunts.reduce((t, h) => t + birdTotal(h), 0);
+  const store = logStoreOK ? '' : '<div class="warn">This browser is blocking saved data, so hunts can\'t be kept here. Private browsing can cause this.</div>';
+  if (!draft) {
+    box.innerHTML = `<div class="pad"><div><h2>Hunt log</h2><p class="quiet">Saved only on this device, not on our servers. To fill in weather, the app sends your hunt spot to the National Weather Service.</p></div>${store}
+      ${logMsg ? `<div class="warn">${esc(logMsg)}</div>` : ''}
+      <button class="btn main" id="lognew">Log a hunt</button>
+      ${hunts.length ? `<div class="stats"><div><b>${hunts.length}</b><span>${hunts.length === 1 ? 'Hunt' : 'Hunts'}</span></div><div><b>${total}</b><span>Birds</span></div><div><b>${(total / hunts.length).toFixed(1)}</b><span>Birds per hunt</span></div></div>` : '<p>No hunts yet. Log your first one to save your spot, notes, birds and the weather.</p>'}
+      <div class="secs">${hunts.map(huntCard).join('')}</div>
+      <section><h3>Backup</h3><p class="quiet">Clearing your browser data deletes your log, and it won't move to a new phone on its own. Save a backup file now and then.</p><div class="btns"><button class="btn" id="logsave">Save backup</button><label class="btn" for="logload" style="margin:0">Restore backup</label><input type="file" id="logload" accept="application/json,.json" hidden></div></section></div>`;
+    bindLogList(hunts);
+    return;
+  }
+  const w = draft.wx || {};
+  box.innerHTML = `<div class="pad"><div><button class="back" id="logback">← Back to log</button><h2>${draft.id ? 'Edit hunt' : 'Log a hunt'}</h2></div>${store}
+    <section><div><label for="lref">Refuge</label><select id="lref">${REFUGES.map(r => `<option value="${r.id}"${r.id === draft.refuge ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
+    <div><label for="ldate">Hunt date</label><input type="date" id="ldate" value="${draft.date}"></div></section>
+    <section><h3>Waypoint</h3><p>${draft.spot ? `Saved at ${draft.spot[0].toFixed(5)}, ${draft.spot[1].toFixed(5)}` : 'Mark where you hunted.'}</p><div class="btns"><button class="btn main" id="ldrop">${draft.spot ? 'Move waypoint' : 'Drop waypoint'}</button><button class="btn" id="lgps">Use my location</button>${draft.spot ? '<button class="btn" id="lclear">Remove</button>' : ''}</div></section>
+    <section><h3>Birds</h3><div class="big" id="ltotal">${birdTotal(draft)}</div><p class="quiet">Total birds</p><div class="kicker">Ducks</div><div class="stps">${DUCK_LIST.map(stepper).join('')}</div><div class="kicker">Geese</div><div class="stps">${GOOSE_LIST.map(stepper).join('')}</div></section>
+    <section><h3>Weather</h3><p class="quiet" id="lwxnote">${esc(draft.wxNote || w.source || '')}</p>
+      <div class="wxf"><div><label for="lwind">Wind (mph)</label><input type="text" inputmode="numeric" id="lwind" value="${esc(w.wind ?? '')}"></div><div><label for="lgust">Gusts (mph)</label><input type="text" inputmode="numeric" id="lgust" value="${esc(w.gust ?? '')}"></div>
+      <div><label for="ldir">Wind from</label><select id="ldir"><option value="">–</option>${COMPASS.map(c => `<option${w.dir === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div><div><label for="lvis">Visibility</label><input type="text" id="lvis" value="${esc(w.vis || '')}"></div>
+      <div><label for="ltemp">Temp (°F)</label><input type="text" inputmode="numeric" id="ltemp" value="${esc(w.temp ?? '')}"></div><div><label for="lsky">Sky</label><input type="text" id="lsky" value="${esc(w.sky || '')}"></div></div>
+      <button class="btn" id="lwxget">Fill in weather again</button></section>
+    <section><label for="lnotes">Notes</label><textarea id="lnotes" rows="5" placeholder="Blind or pond, water level, what worked">${esc(draft.notes)}</textarea></section>
+    <div class="btns"><button class="btn main" id="lsave">Save hunt</button><button class="btn" id="lcancel">Cancel</button></div></div>`;
+  bindLogForm();
+}
+function bindLogList(hunts){
+  $('#lognew').onclick = () => { draft = newDraft(); logMsg = ''; renderLog(); setSheet('full'); fetchHuntWeather(); };
+  const b = $('#logview');
+  b.querySelectorAll('[data-ledit]').forEach(x => { x.onclick = () => { draft = JSON.parse(JSON.stringify(hunts.find(h => h.id === x.dataset.ledit))); draft.wxNote = ''; renderLog(); $('#logview').scrollTop = 0; showDraftPin(); }; });
+  b.querySelectorAll('[data-ldel]').forEach(x => { x.onclick = () => {
+    if (confirmDelete === x.dataset.ldel) { storeHunts(loadHunts().filter(h => h.id !== x.dataset.ldel)); confirmDelete = null; }
+    else confirmDelete = x.dataset.ldel;
+    const keep = x.dataset.ldel; renderLog(); showLogPins(true);
+    const c = $(`#logview [data-ldel="${keep}"]`); if (c) c.closest('details').open = true;
+  }; });
+  b.querySelectorAll('[data-lshow]').forEach(x => { x.onclick = () => { const h = hunts.find(i => i.id === x.dataset.lshow); setSheet('peek'); setTimeout(() => { map.setView(h.spot, 15); }, 280); }; });
+  $('#logsave').onclick = () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(loadHunts(), null, 1)], {type:'application/json'}));
+    const l = document.createElement('a'); l.href = url; l.download = `refuge-rat-log-${toISO(today())}.json`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+  $('#logload').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const incoming = JSON.parse(await file.text());
+      if (!Array.isArray(incoming) || incoming.some(h => !h.id || !h.date || !h.refuge)) throw 0;
+      const all = {}; loadHunts().concat(incoming).forEach(h => { all[h.id] = h; });
+      storeHunts(Object.values(all)); logMsg = `Restored ${incoming.length} ${incoming.length === 1 ? 'hunt' : 'hunts'}.`;
+    } catch (err) { logMsg = "That file isn't a Refuge Rat backup, so nothing changed."; }
+    renderLog(); showLogPins(true);
+  };
+}
+function readWxFields(){
+  draft.notes = $('#lnotes').value;
+  draft.wx = Object.assign(draft.wx || {}, {wind:$('#lwind').value.trim(), gust:$('#lgust').value.trim(), dir:$('#ldir').value, vis:$('#lvis').value.trim(), temp:$('#ltemp').value.trim(), sky:$('#lsky').value.trim()});
+}
+function bindLogForm(){
+  const scroll = () => {};
+  $('#logback').onclick = $('#lcancel').onclick = () => { draft = null; wxToken++; clearDraftPin(); stopDrop(); renderLog(); showLogPins(true); };
+  $('#lref').onchange = e => { readWxFields(); draft.refuge = e.target.value; draft.spot = null; clearDraftPin(); renderLog(); fetchHuntWeather(); };
+  $('#ldate').onchange = e => { if (!e.target.value) return; readWxFields(); draft.date = e.target.value; renderLog(); fetchHuntWeather(); };
+  $('#ldrop').onclick = () => { readWxFields(); startDrop(); };
+  $('#lgps').onclick = () => {
+    readWxFields();
+    if (!navigator.geolocation || !isSecureContext) { flash('Location needs the secure version of the site.'); return; }
+    navigator.geolocation.getCurrentPosition(p => { placeWaypoint({lat:p.coords.latitude, lng:p.coords.longitude}); }, () => flash('Could not get your location. Check the browser location permission.'));
+  };
+  const c = $('#lclear'); if (c) c.onclick = () => { readWxFields(); draft.spot = null; clearDraftPin(); const y = $('#logview').scrollTop; renderLog(); $('#logview').scrollTop = y; };
+  $('#logview').querySelectorAll('[data-plus],[data-minus]').forEach(x => { x.onclick = () => {
+    const n = x.dataset.plus || x.dataset.minus, d = x.dataset.plus ? 1 : -1;
+    draft.birds[n] = Math.max(0, (draft.birds[n] || 0) + d);
+    if (!draft.birds[n]) delete draft.birds[n];
+    $('#logview').querySelector(`[data-count="${n}"]`).textContent = draft.birds[n] || 0;
+    $('#ltotal').textContent = birdTotal(draft);
+  }; });
+  $('#lwxget').onclick = () => { readWxFields(); fetchHuntWeather(); };
+  $('#lsave').onclick = () => {
+    readWxFields();
+    const list = loadHunts(), rec = {id:draft.id || String(Date.now()), refuge:draft.refuge, date:draft.date, notes:draft.notes, birds:draft.birds, spot:draft.spot, wx:draft.wx};
+    const i = list.findIndex(h => h.id === rec.id);
+    if (i >= 0) list[i] = rec; else list.push(rec);
+    if (!storeHunts(list)) { flash("This browser wouldn't save the hunt."); renderLog(); return; }
+    logMsg = 'Hunt saved.'; draft = null; wxToken++; clearDraftPin(); renderLog(); showLogPins(true); $('#logview').scrollTop = 0;
+  };
+}
+function huntPoint(){
+  if (draft.spot) return {lat:draft.spot[0], lng:draft.spot[1]};
+  const m = markers[draft.refuge]; if (m) return m.getLatLng();
+  const r = REFUGES.find(x => x.id === draft.refuge); return {lat:r.lat, lng:r.lng};
+}
+/* Forecast for dates NWS still has, otherwise the nearest station's record near shoot time. */
+async function fetchHuntWeather(){
+  if (!draft) return;
+  const token = ++wxToken, d = draft, ll = huntPoint(), date = fromISO(d.date);
+  const note = t => { d.wxNote = t; const n = $('#lwxnote'); if (n && draft === d) n.textContent = t; };
+  note('Getting weather…');
+  const shoot = sunriseUTC(date, ll.lat, ll.lng) - 30 * 6e4;
+  const isFuture = shoot > Date.now();
+  let wx = null;
+  try {
+    const point = (await getJSON(`https://api.weather.gov/points/${ll.lat.toFixed(4)},${ll.lng.toFixed(4)}`)).properties;
+    if (shoot > Date.now() - 12 * 36e5) {
+      const p = (await getJSON(point.forecastGridData)).properties, v = k => valueAt(series(p, k), shoot);
+      if (v('windSpeed') != null) {
+        const vis = v('visibility');
+        wx = {wind:toMph(v('windSpeed')), gust:toMph(v('windGust')), dir:v('windDirection') == null ? '' : compass(v('windDirection')), vis:vis == null ? '' : visText(vis), temp:toF(v('temperature')), sky:skyText(v('skyCover')), source:`National Weather Service forecast for about shoot time`};
+      }
+    }
+    if (!wx && !isFuture) {
+      const q = `start=${new Date(shoot - 2 * 36e5).toISOString()}&end=${new Date(shoot + 3 * 36e5).toISOString()}`;
+      const stations = (await getJSON(point.observationStations)).features.slice(0, 4);
+      for (const st of stations) {
+        const obs = (await getJSON(`${st.id}/observations?${q}`)).features.map(f => f.properties).filter(o => o.windSpeed && o.windSpeed.value != null);
+        if (!obs.length) continue;
+        const o = obs.sort((x, y) => Math.abs(Date.parse(x.timestamp) - shoot) - Math.abs(Date.parse(y.timestamp) - shoot))[0], n = f => o[f] && o[f].value != null ? o[f].value : null;
+        wx = {wind:toMph(n('windSpeed')), gust:toMph(n('windGust')), dir:n('windDirection') == null ? '' : compass(n('windDirection')), vis:n('visibility') == null ? '' : visText(n('visibility')), temp:toF(n('temperature')), sky:o.textDescription || '', source:`Recorded at ${st.properties.name}, ${new Date(o.timestamp).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit', timeZone:LA})}. This station may be miles away.`};
+        break;
+      }
+    }
+  } catch (e) {}
+  if (token !== wxToken || draft !== d) return;
+  if (!wx) { note("NWS has no weather for this date and spot. Type it in below if you'd like it saved."); return; }
+  d.wx = Object.assign({}, wx, {wind:wx.wind ?? '', gust:wx.gust ?? '', temp:wx.temp ?? ''});
+  d.wxNote = wx.source;
+  if ($('#lwind')) { d.notes = $('#lnotes').value; const y = $('#logview').scrollTop; renderLog(); $('#logview').scrollTop = y; }
+}
+const logPinIcon = () => L.divIcon({className:'', iconSize:[22, 22], iconAnchor:[11, 11], html:'<div class="logpin"></div>'});
+function showLogPins(on){
+  if (!map) return;
+  if (logPins) { map.removeLayer(logPins); logPins = null; }
+  if (!on) return;
+  logPins = L.layerGroup(loadHunts().filter(h => h.spot).map(h => L.marker(h.spot, {icon:logPinIcon(), title:refugeName(h.refuge)}).bindPopup(`<b>${esc(refugeName(h.refuge))}</b>${esc(fmt(fromISO(h.date)))}, ${birdTotal(h)} birds`))).addTo(map);
+}
+function clearDraftPin(){ if (draftPin && map) { map.removeLayer(draftPin); } draftPin = null; }
+function showDraftPin(){
+  clearDraftPin();
+  if (map && draft && draft.spot) draftPin = L.marker(draft.spot, {icon:logPinIcon(), interactive:false}).addTo(map);
+}
+function startDrop(){
+  if (!map) { flash('The map did not load.'); return; }
+  dropping = true; document.body.classList.add('dropping'); $('#dropbar').hidden = false;
+  setSheet('peek');
+  setTimeout(() => {
+    const b = refugeBounds(draft.refuge);
+    if (b && b.isValid()) map.fitBounds(b, Object.assign(fitOpts(), {maxZoom:15}));
+    else map.setView(huntPoint(), 13);
+  }, 280);
+}
+function stopDrop(){ dropping = false; document.body.classList.remove('dropping'); $('#dropbar').hidden = true; }
+function placeWaypoint(ll){
+  stopDrop();
+  if (!draft) return;
+  draft.spot = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)];
+  showDraftPin();
+  renderLog();
+  setSheet('half');
+  fetchHuntWeather();
+}
+
 /* ---------- shell ---------- */
 function setTab(t){
   document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
@@ -1395,6 +1614,9 @@ function setTab(t){
   $('#howview').hidden = t !== 'how';
   $('#drawview').hidden = t !== 'draw';
   $('#birdview').hidden = t !== 'birds';
+  $('#logview').hidden = t !== 'log';
+  showLogPins(t === 'log');
+  if (t === 'log') renderLog();
   $('#detail').hidden = true;
   if (t === 'map' && selected) { $('#mapview').hidden = true; $('#detail').hidden = false; }
 }
@@ -1411,6 +1633,7 @@ document.addEventListener('click', e => {
 });
 
 drawLegend(null);
+$('#dropcancel').onclick = () => { stopDrop(); setSheet('full'); };
 initSheet(); initControls(); renderList(); renderHow(); renderAll(); initMap();
 
 /* Pick up newer data without a refresh: every 2 minutes from 8 to 9:15 PM Pacific, when draw results post, and every 15 otherwise. */
