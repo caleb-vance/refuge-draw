@@ -1294,7 +1294,7 @@ function insideRefuge(id, ll){
 }
 let legendOpen = true, legendFor = null;
 function drawLegend(id){
-  if (id !== legendFor) { legendOpen = true; legendFor = id; }
+  if (id !== legendFor) { legendOpen = !id; legendFor = id; }
   const rows = id ? keyFor(id).join('') : Object.values(VAC).map(v => `<div>${pinSvg(v.color, 12)}<span>${esc(v.label)}</span></div>`).join('');
   const box = $('#legend');
   box.hidden = !rows;
