@@ -132,6 +132,9 @@ section{display:flex;flex-direction:column;gap:9px;min-width:0}
 .stats b.ok{color:var(--green)}
 .stats b.lim{color:var(--accent)}
 .stats b.nope{color:var(--red)}
+.floodimg{all:unset;cursor:pointer;display:block;width:100%;background:#fff;border-radius:8px;overflow:hidden}
+.floodimg img{display:block;width:100%}
+.floodimg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .wx svg{width:64px;height:64px;color:var(--accent)}
 .wx .big{font-size:44px}
@@ -909,6 +912,29 @@ function weatherHtml(r, ll, wx, nwsLink){
     ${current}
     <p class="quiet">Forecast for the area around this refuge's pin${updated ? `, updated ${esc(updated)}` : ''}. Wind on the marsh can differ. Source: ${link(nwsLink, 'National Weather Service')}. Refuge Rat is not endorsed by NWS.</p>`;
 }
+/* Official 2026 flood-up maps. These are images only and are never laid on the satellite map. */
+const CDFW_DOC = n => `https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=${n}&inline`;
+const FWS_FLOOD = f => `https://www.fws.gov/sites/default/files/documents/2026-10/${f}.pdf`;
+const KF = {label:'Kesterson and Freitas units', img:'overlays/flood-kesterson-freitas.jpg', pdf:FWS_FLOOD('kesterson-freitas-unit-floodup-2026')};
+const FLOOD = {
+  losbanos:[{label:'Los Banos', img:'overlays/flood88660.png', pdf:CDFW_DOC(88660)}, {label:'Mud Slough Unit', img:'overlays/flood88662.png', pdf:CDFW_DOC(88662)}],
+  saltslough:[{label:'Salt Slough Unit', img:'overlays/flood88659.png', pdf:CDFW_DOC(88659)}],
+  gadwall:[{label:'Gadwall Unit', img:'overlays/flood88658.png', pdf:CDFW_DOC(88658)}],
+  china:[{label:'China Island Unit', img:'overlays/flood88656.png', pdf:CDFW_DOC(88656)}],
+  volta:[{label:'Volta', img:'overlays/flood88665.png', pdf:CDFW_DOC(88665)}],
+  sanluis:[{label:'San Luis Unit', img:'overlays/flood-san-luis.jpg', pdf:FWS_FLOOD('san-luis-unit-floodup-2026')}, {label:'Blue Goose Unit', img:'overlays/flood-blue-goose.jpg', pdf:FWS_FLOOD('blue-goose-unit-floodup-2026')}],
+  kesterson:[KF], freitasn:[KF], freitass:[KF],
+  bearcreek:[{label:'East Bear Creek Unit', img:'overlays/flood-ebc.jpg', pdf:FWS_FLOOD('ebc-unit-floodup-2026')}, {label:'West Bear Creek Unit', img:'overlays/flood-wbc.jpg', pdf:FWS_FLOOD('wbc-unit-floodup-2026')}],
+  merced:[{label:'Merced', img:'overlays/flood-merced.jpg', pdf:FWS_FLOOD('merced_floodup_2026')}]
+};
+function floodPage(r){
+  const maps = FLOOD[r.id];
+  if (!maps) {
+    const check = ['sacramento','delevan','colusa','sutter'].includes(r.id);
+    return `<section><h3>Planned flood map</h3><p>${check ? 'USFWS says flood-up maps for this refuge are only available in person at the hunter check station.' : `We couldn't find a flood map for this refuge online. Call ${esc(r.phone)} or ask at the check station.`}</p></section>`;
+  }
+  return `<section><h3>Planned flood maps</h3><p class="quiet">Official 2026 plans. Tap a map to zoom in. Schedules can change with water and weather, so confirm with the refuge.</p></section>` + maps.map(m => `<section><div class="kicker">${esc(m.label)}</div><button class="floodimg" data-fimg="${esc(m.img)}" data-flabel="${esc(m.label)} flood map"><img src="${esc(m.img)}" alt="${esc(m.label)} 2026 flood map" loading="lazy"></button><div class="btns">${link(m.pdf, 'Official PDF', 'btn')}</div></section>`).join('');
+}
 function birdPage(r){
   return birdSummary(r) + blindSection(r);
 }
@@ -1104,14 +1130,15 @@ function openDetail(id, keepScroll){
   Object.keys(markers).forEach(k => { const x = REFUGES.find(z => z.id === k); markers[k].setIcon(pinIcon(x, k === id)); });
   const hunt = fromISO(huntISO);
   const h = harvestFor(r).slice(0, 3);
-  const huntMaps = r.maps.filter(m => m.hunt), otherMaps = r.maps.filter(m => !m.hunt);
+  const huntMaps = r.maps.filter(m => m.hunt), otherMaps = r.maps.filter(m => !m.hunt && !/flood/i.test(m.label));
   const ovs = overlaysFor(id);
   const el = $('#detail');
   const scroll = el.scrollTop;
   el.innerHTML = `<div class="pad">
     <div><button class="back" id="back">← All refuges</button><p class="quiet">Or tap the map outside this area.</p></div>
     <div><div class="kicker">${esc(r.region)} · Type ${r.kind} area</div><h2>${esc(r.name)}</h2></div>
-    <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button><button data-pane="weather" aria-pressed="${detailPane === 'weather'}">Weather</button></div>
+    <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button><button data-pane="weather" aria-pressed="${detailPane === 'weather'}">Weather</button><button data-pane="flood" aria-pressed="${detailPane === 'flood'}">Flood</button></div>
+    <div id="pane-flood" class="pad" style="padding:0" ${detailPane === 'flood' ? '' : 'hidden'}>${floodPage(r)}</div>
     <div id="pane-weather" class="pad" style="padding:0" ${detailPane === 'weather' ? '' : 'hidden'}><p class="quiet">Loading the forecast…</p></div>
     <div id="pane-birds" class="pad" style="padding:0" ${detailPane === 'birds' ? '' : 'hidden'}>${birdPage(r)}</div>
     <div id="pane-plan" class="pad" style="padding:0" ${detailPane === 'plan' ? '' : 'hidden'}>
@@ -1154,6 +1181,7 @@ function openDetail(id, keepScroll){
   el.querySelectorAll('[data-bs]').forEach(b => { b.onclick = () => { blindSeason = +b.dataset.bs; openDetail(id, true); }; });
   el.querySelectorAll('[data-bv]').forEach(b => { b.onclick = () => { blindView = b.dataset.bv; openDetail(id, true); }; });
   const bd = $('#blindday'); if (bd) bd.onchange = () => { blindDate = bd.value; openDetail(id, true); };
+  el.querySelectorAll('[data-fimg]').forEach(b => { b.onclick = () => { const v = $('#viewer'); v.innerHTML = `<button class="btn main" id="vclose">Close</button><img src="${esc(b.dataset.fimg)}" alt="${esc(b.dataset.flabel)}">`; v.hidden = false; $('#vclose').onclick = () => { v.hidden = true; }; }; });
   el.querySelectorAll('[data-pane]').forEach(b => { b.onclick = () => { detailPane = b.dataset.pane; openDetail(id, true); }; });
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
