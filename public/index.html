@@ -789,6 +789,10 @@ section{display:flex;flex-direction:column;gap:9px;min-width:0}
 .warn{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 12px;font-size:14px}
 .quiet{color:var(--muted);font-size:14px;margin:0}
 .big{font:700 54px var(--display);line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.stats.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stats b.ok{color:var(--green)}
+.stats b.lim{color:var(--accent)}
+.stats b.nope{color:var(--red)}
 .wx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .wx svg{width:64px;height:64px;color:var(--accent)}
 .wx .big{font-size:44px}
@@ -1634,6 +1638,62 @@ function timeline(r, hunt){
       <div class="what"><b>${esc(s.title)}</b>${s.html || esc(s.body)}</div></li>`;
   }).join('');
 }
+/* Bike rules for waterfowl hunt days, from the 2026 CDFW regulations booklet, USFWS hunt pages and CDFW area pages. */
+const REGS_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=203137&inline';
+const STATE_BIKE = {bike:'limited', label:'Limited', text:'Allowed only on roads or levees, to get between parking lots and hunting areas during waterfowl season.'};
+const STATE_EBIKE = 'Not allowed unless posted as allowed.';
+const VEHICLE_ROADS = {bike:'limited', label:'Limited', text:'Allowed only on roads open to vehicles.'};
+const NO_SEASON_BIKE = {bike:'no', label:'Not allowed', text:'Not allowed during waterfowl season. The rule allows bikes only from one week after the season until two weeks before the next one.'};
+const SAC_BIKE = {bike:'no', label:'Not allowed', text:'The refuge hunt map says no bicycles. Hunt areas are reached on foot.', ebike:'Not allowed. Bicycles and other conveyances are barred from the hunt area.'};
+const FWS_BIKE = {bike:'yes', label:'Allowed', text:'Allowed. Your gun must be unloaded while riding.', ebike:'Not allowed.'};
+const ISLAND_BIKE = {bike:'no', label:'Not allowed', text:"The area's page says no bicycles. The state regulation is less strict, so ask the area if you want to bring one.", src:'page'};
+const BIKES = {
+  sacramento:{...SAC_BIKE, text:SAC_BIKE.text + ' A separate rule allows bikes May 15 to August 15 on the auto tour road.'}, delevan:SAC_BIKE,
+  colusa:{...SAC_BIKE, text:SAC_BIKE.text + ' A separate rule allows bikes May 15 to August 15 on the auto tour road.'}, sutter:SAC_BIKE,
+  sanluis:FWS_BIKE, kesterson:FWS_BIKE, freitasn:FWS_BIKE, freitass:FWS_BIKE, bearcreek:FWS_BIKE, merced:FWS_BIKE,
+  kern:{bike:'no', label:'Not allowed', text:'The refuge bars bicycles because of low visibility, two-way traffic and dangerous road conditions.', ebike:'Not allowed.', src:'page'},
+  howard:NO_SEASON_BIKE, littledry:NO_SEASON_BIKE, llano:NO_SEASON_BIKE,
+  yolo:{bike:'no', label:'Not allowed', text:"The area's page says no bicycles. The state regulation allows them only in designated areas, so ask the area before bringing one.", src:'page'},
+  grizzly:ISLAND_BIKE, joice:ISLAND_BIKE,
+  mendota:{...STATE_BIKE, text:STATE_BIKE.text + ' Bikes are not allowed on the tour loop.'},
+  buttevalley:VEHICLE_ROADS, shasta:VEHICLE_ROADS, dakin:VEHICLE_ROADS, fleming:VEHICLE_ROADS,
+  willow:{bike:'limited', label:'Limited', text:'Allowed only on designated trails and roads.'}
+};
+function bikeBlock(r){
+  const b = BIKES[r.id] || STATE_BIKE, cls = {yes:'ok', limited:'lim', no:'nope'}[b.bike];
+  return `<section><h3>Bikes</h3><div class="stats two"><div><b class="${cls}">${esc(b.label)}</b><span>Regular bikes</span></div><div><b class="nope">Not allowed</b><span>E-bikes</span></div></div>
+    <p>${esc(b.text)}</p><p><b>E-bikes:</b> ${esc(b.ebike || STATE_EBIKE)}</p>
+    <p class="quiet">Rules for waterfowl hunt days. Check posted signs. Sources: ${link(REGS_URL, '2026 regulations')} and ${link(r.page, 'the area page')}.</p></section>`;
+}
+/* When lottery entries are called, where the source says more than "after reservations". */
+const UBB_CALL = 'Lottery entry starts 1½ hours before shoot time, or after reservations are done.';
+const SJ_WI = 'Starts after the last reservation is called, so there is no set clock time.';
+const LOTTERY_CALL = {
+  howard:UBB_CALL, littledry:UBB_CALL,
+  llano:UBB_CALL + ' Lottery numbers are issued at 4:00 AM, and the order is set at 4:30 AM.',
+  kern:'Put your card in the box at least 2 hours before shoot time. A random draw then sets the order after reservations, and refills run until 2:00 PM.',
+  yolo:'Called after reservations, in draw-number order, then the first-come line. Blinds refill until 2:00 PM.',
+  sanjacinto:SJ_WI + ' Register at 3:00 AM. Vacancies are not filled after 1:00 PM.',
+  wister:SJ_WI,
+  freitasn:'Starts after the reservation window closes at 3:00 AM, if spots remain.',
+  freitass:'Starts after the reservation window closes at 3:00 AM, if spots remain.',
+  merced:'No refills. Lottery entries are called only to fill reservation no-shows.'
+};
+const LINE_CALL = 'There is no lottery. The first-come line is called after reservations are done.';
+function callsBlock(r, hunt){
+  if (r.vacType === 'call' || !r.checkin) return `<section><h3>Morning call times</h3><p>CDFW's table covers Type A areas only. Call ${esc(r.phone)} for this area's times.</p></section>`;
+  let shoot = null;
+  try { shoot = roundTo5(sunriseUTC(hunt, r.lat, r.lng) - 30 * 6e4); } catch (e) {}
+  const est = h => shoot ? ` (about ${clock(shoot - h * 36e5)})` : '';
+  const expH = (r.expires.match(/1½|1 hour/) || [])[0];
+  const expText = r.checkinAt && !expH ? r.expires : r.expires + (expH ? est(expH === '1½' ? 1.5 : 1) : '');
+  const lot = r.vacType === 'line' ? LINE_CALL : r.vacType === 'none' ? r.vacancy : LOTTERY_CALL[r.id] || `Called after reservations, so there is no set clock time. Reservations are held until ${r.expires}${expH ? est(expH === '1½' ? 1.5 : 1) : ''}.`;
+  return `<section><h3>Morning call times</h3><div class="card"><ol class="tl">
+    <li><div class="when">Reservations<small>Calls begin</small></div><div class="what">${esc(r.checkinH ? r.checkin.replace(/^([^.,]*(?:shoot time))/, m => m + est(r.checkinH)) : r.checkin)}.</div></li>
+    <li><div class="when">Reservations<small>Expire</small></div><div class="what">${esc(expText)}.</div></li>
+    <li class="key"><div class="when">${r.vacType === 'line' ? 'Line' : r.vacType === 'none' ? 'No refills' : 'Lottery'}<small>${r.vacType === 'none' ? '' : 'Calls'}</small></div><div class="what">${esc(lot)}</div></li>
+  </ol></div><p class="quiet">Clock times are estimates for ${esc(fmt(hunt))}, based on sunrise. CDFW publishes most of these as hours before shoot time. Confirm with the check station.</p></section>`;
+}
 function oddsBlock(r){
   const hd = huntDays(r);
   const rows = hd.map(wd => {
@@ -1703,6 +1763,8 @@ function openDetail(id, keepScroll){
       <div><b>${num(r.odds.res)}</b><span>Reservations</span></div>
     </div>
     <p class="quiet">2025-26 regular season, all hunt days combined. CDFW doesn't publish these by date, but says Saturdays are harder to draw, and Wednesdays and Sundays easier.</p></section>
+    ${callsBlock(r, hunt)}
+    ${bikeBlock(r)}
     <section>
       <h3>Your hunt timeline</h3>
       <div><label for="huntdate">Hunt date</label><input type="date" id="huntdate" value="${huntISO}"></div>
