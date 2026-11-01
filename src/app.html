@@ -138,6 +138,19 @@ section{display:flex;flex-direction:column;gap:9px;min-width:0}
 .floodimg{all:unset;cursor:pointer;display:block;width:100%;background:#fff;border-radius:8px;overflow:hidden}
 .floodimg img{display:block;width:100%}
 .floodimg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drawline{display:flex;align-items:center;gap:6px;font-weight:600}
+.secs{display:flex;flex-direction:column;gap:8px}
+details.sec>summary{list-style:none;align-items:center;padding:12px 13px}
+details.sec>summary::-webkit-details-marker{display:none}
+.sec-t{display:flex;flex-direction:column;min-width:0}
+.sec-t b{font:600 17px/1.2 var(--display);letter-spacing:.02em;text-transform:uppercase;color:var(--ink)}
+.sec-t small{font-size:14px;font-weight:500;color:var(--muted)}
+.chev{font-style:normal;color:var(--accent);font-size:18px;transition:transform .15s}
+details.sec[open] .chev{transform:rotate(180deg)}
+details.sec[open]{outline:1px solid var(--accent)}
+.sec-b,.inner-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.sec-b{padding:2px 13px 16px}
+.sec-b .card,.sec-b details,.sec-b .stats div,.sec-b ul.signup li{background:var(--raised)}
 .wx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .wx svg{width:64px;height:64px;color:var(--accent)}
 .wx .big{font-size:44px}
@@ -761,7 +774,7 @@ function renderList(){
 }
 
 /* ---------- refuge detail ---------- */
-let huntISO = toISO(nextSaturday()), detailPane = 'plan';
+let huntISO = toISO(nextSaturday()), detailPane = null;
 const areaKey = n => String(n).toUpperCase();
 function seasonStats(r){
   const rows = harvestFor(r);
@@ -1137,6 +1150,55 @@ function drawCard(d, i){
       <p class="quiet">${link(d.url, 'Official PDF')} · Draw completed ${esc(d.drawDate || 'unknown')}</p>
     </div></details>`;
 }
+const UBB_BIO = 'one of the three units of the roughly 9,600-acre Upper Butte Basin Wildlife Area, part of one of the finest wetland complexes in North America.';
+const SL_BIO = 'San Luis National Wildlife Refuge covers over 26,800 acres of wetlands, riparian woodlands, native grasslands and vernal pools.';
+const NG_BIO = 'North Grasslands Wildlife Area is about 7,400 acres of wetlands, riparian habitat and uplands, and this is one of its three units.';
+const HONEY_BIO = 'Honey Lake Wildlife Area is about 7,600 acres of sagebrush around a shallow Great Basin lake, supporting migratory waterfowl, tundra swans and sandhill cranes.';
+const BIOS = {
+  sacramento:'Established in 1937, Sacramento National Wildlife Refuge provides habitat for migratory birds and helps reduce crop damage. Hunting is from assigned ponds and blinds, plus free roam.',
+  delevan:'Established in 1962 with Federal Duck Stamp funds, this 5,877-acre refuge supports over 300,000 ducks and 100,000 geese at the winter peak.',
+  colusa:'Established in 1945, this 5,077-acre refuge in the Colusa Basin is mostly wetlands, grasslands and riparian habitat that regularly floods in winter.',
+  sutter:'Established in 1945 to give migratory birds places to feed and nest, Sutter is hunted from assigned ponds and free roam.',
+  graylodge:'In the Sacramento Valley, Gray Lodge is home to over 300 species of birds and mammals, and more than 1 million waterfowl use it every year.',
+  howard:`Howard Slough is ${UBB_BIO}`, littledry:`Little Dry Creek is ${UBB_BIO}`, llano:`Llano Seco is ${UBB_BIO}`,
+  yolo:'A short distance from UC Davis and downtown Sacramento, Yolo Bypass has about 7,900 acres of wetlands and uplands open to waterfowl and upland hunting.',
+  grizzly:'In the Suisun Marsh, Grizzly Island is a complex of several units in one of the richest wetland environments in Northern California.',
+  joice:'Joice Island is a unit of the Grizzly Island complex in the Suisun Marsh. There are no refills, so a reservation is the only way in.',
+  sanluis:SL_BIO, kesterson:`${SL_BIO} Kesterson is hunted from assigned blinds.`, freitasn:`${SL_BIO} Freitas North is a boat hunt.`, freitass:`${SL_BIO} Freitas South is a boat hunt.`,
+  bearcreek:`${SL_BIO} East Bear Creek opens the third Saturday of November, and West Bear Creek the first Saturday of December.`,
+  merced:'Merced National Wildlife Refuge covers 10,258 acres of wetlands, native grasslands, vernal pools and riparian areas.',
+  saltslough:NG_BIO, gadwall:NG_BIO, china:NG_BIO,
+  losbanos:'In the San Joaquin Valley, Los Banos is about 6,200 acres of wetlands supporting over 200 bird species.',
+  volta:'Volta is about 3,800 acres of managed marsh and valley alkali shrub, with 150 bird species including large numbers of waterfowl and shorebirds.',
+  mendota:"In the Central Valley, Mendota's seasonally flooded freshwater wetlands attract migrating waterfowl.",
+  kern:'In the southern San Joaquin Valley, Kern National Wildlife Refuge is hunted from assigned ponds and free roam.',
+  sanjacinto:'In Southern California, San Jacinto covers about 19,000 acres, including 900 acres of restored wetlands.',
+  wister:'Wister is a unit of Imperial Wildlife Area, about 7,900 acres of salt marshes, freshwater ponds and desert scrub.',
+  ashcreek:'One of the most remote CDFW lands, Ash Creek in northeastern California has natural wetlands, vernal pools and sagebrush country.',
+  buttevalley:'Butte Valley is about 13,400 acres of wetlands, sage flats and farmland, including the 4,000-acre Meiss Lake.',
+  shasta:'Established in 1991 below Mount Shasta, this area is about 4,700 acres of juniper woodland, riparian forest, seasonal wetlands and crops.',
+  dakin:HONEY_BIO, fleming:HONEY_BIO,
+  willow:'Designated in 1990, Willow Creek is about 2,700 acres of meadows, wetlands and shallow marshes, and a major water source for Honey Lake.'
+};
+function sec(key, title, hint, body){
+  return `<details class="sec" data-sec="${key}"${detailPane === key ? ' open' : ''}><summary><div class="sec-t"><b>${esc(title)}</b><small>${esc(hint)}</small></div><i class="chev" aria-hidden="true">▾</i></summary><div class="sec-b">${body}</div></details>`;
+}
+function groupsShort(r){
+  if (GROUPS_B[r.id] != null) return `~${GROUPS_B[r.id]}`;
+  const g = GROUPS[r.id]; if (!g) return '–';
+  const n = [g.avg, g.late].filter(v => v != null), lo = Math.min(...n), hi = Math.max(...n);
+  return lo === hi ? `~${lo}` : `${lo}–${hi}`;
+}
+function birdsShort(r){
+  const s = seasonStats(r), l = lastStats(r);
+  return s ? s.avg.toFixed(1) : l ? l.avg.toFixed(1) : '–';
+}
+function listHint(r){
+  if (r.vacType === 'line') return 'First-come line, no list';
+  if (r.vacType === 'none' || r.vacType === 'call') return 'No online list';
+  const l = drawsFor(r).filter(d => (d.entries || []).length);
+  return l.length ? `${l[0].entries.length} tickets, ${fmt(usDate(l[0].huntDate), {month:'short', day:'numeric'})}` : 'No readable list online';
+}
 function openDetail(id, keepScroll){
   const r = REFUGES.find(x => x.id === id); if (!r) return;
   selected = id;
@@ -1150,41 +1212,43 @@ function openDetail(id, keepScroll){
   el.innerHTML = `<div class="pad">
     <div><button class="back" id="back">← All refuges</button><p class="quiet">Or tap the map outside this area.</p></div>
     <div><div class="kicker">${esc(r.region)} · Type ${r.kind} area</div><h2>${esc(r.name)}</h2></div>
-    <div class="seg"><button data-pane="plan" aria-pressed="${detailPane === 'plan'}">Hunt plan</button><button data-pane="birds" aria-pressed="${detailPane === 'birds'}">Birds</button><button data-pane="weather" aria-pressed="${detailPane === 'weather'}">Weather</button><button data-pane="flood" aria-pressed="${detailPane === 'flood'}">Flood</button></div>
-    <div id="pane-flood" class="pad" style="padding:0" ${detailPane === 'flood' ? '' : 'hidden'}>${floodPage(r)}</div>
-    <div id="pane-weather" class="pad" style="padding:0" ${detailPane === 'weather' ? '' : 'hidden'}><p class="quiet">Loading the forecast…</p></div>
-    <div id="pane-birds" class="pad" style="padding:0" ${detailPane === 'birds' ? '' : 'hidden'}>${birdPage(r)}</div>
-    <div id="pane-plan" class="pad" style="padding:0" ${detailPane === 'plan' ? '' : 'hidden'}>
-    ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><button class="btn" id="fullkey">See full map and its key</button><p class="quiet">${ovs[0].approx ? 'This PDF has no GPS data, so we lined it up by hand with the official boundary. Use it as a guide, and trust field signs and the PDF.' : "Placed from the PDF's GPS data and cut to the official boundary."} The full map shows the area types and symbols this refuge uses.</p></section>` : FULL_MAP[r.id] ? `<section><div class="warn">${esc(FULL_MAP[r.id].note)}</div><div class="btns"><button class="btn main" id="fullkey">See full map and its key</button></div></section>` : `<div class="warn">The hunt map PDF has no GPS data, so it isn't laid on the imagery. ${focusedFacilities(r.id).length ? 'Official blind and parking points are shown instead. Numbered ponds and zones are in the PDF.' : 'The official boundary is drawn instead. Zones are in the PDF.'}</div>`}
-    <div class="kicker">Official PDFs</div>
-    <div class="btns">
-      ${huntMaps.map((m, i) => link(m.url, m.label, i === 0 ? 'btn main' : 'btn')).join('')}
-      ${otherMaps.map((m, i) => link(m.url, m.label, !huntMaps.length && i === 0 ? 'btn main' : 'btn')).join('')}
-      ${link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(r.name.replace(/\s*\(.*\)/, '') + ' California'), 'Directions', 'btn')}
+    <p>${esc(BIOS[r.id] || '')}</p>
+    <div class="stats">
+      <div><b>1 in ${r.odds.one}</b><span>Reservation odds</span></div>
+      <div><b>${esc(groupsShort(r))}</b><span>Groups per day</span></div>
+      <div><b>${esc(birdsShort(r))}</b><span>${seasonStats(r) ? 'Birds per hunter' : 'Birds per hunter, last yr'}</span></div>
     </div>
-    ${!huntMaps.length ? `<p class="quiet">We could not find a dedicated waterfowl hunt map online for this unit, so this is the general area map. Ask the area for the hunt zones.</p>` : ''}
+    <p class="drawline">${pinSvg(VAC[r.vacType].color, 14)}<span>${esc(VAC[r.vacType].label)}</span></p>
     ${r.note ? `<div class="warn">${esc(r.note)}</div>` : ''}
-    ${oddsBlock(r)}
-    <section><h3>Reservation drawing</h3><div class="stats">
-      <div><b>1 in ${r.odds.one}</b><span>Season odds</span></div>
-      <div><b>${num(r.odds.apps)}</b><span>Applications</span></div>
-      <div><b>${num(r.odds.res)}</b><span>Reservations</span></div>
-    </div>
-    <p class="quiet">2025-26 regular season, all hunt days combined. CDFW doesn't publish these by date, but says Saturdays are harder to draw, and Wednesdays and Sundays easier.</p></section>
-    ${callsBlock(r, hunt)}
-    ${bikeBlock(r)}
-    <section>
-      <h3>Your hunt timeline</h3>
+    <div class="secs">
+    ${sec('maps', 'Maps and directions', ovs.length ? 'Hunt map on the satellite view' : 'Official PDFs and directions', `
+      ${ovs.length ? `<section><div class="kicker">On the map</div><div class="btns">${ovs.map(o => `<button class="btn" data-ov="${esc(o.img)}" aria-pressed="false">${esc(o.label)}</button>`).join('')}</div><button class="btn" id="fullkey">See full map and its key</button><p class="quiet">${ovs[0].approx ? 'This PDF has no GPS data, so we lined it up by hand with the official boundary. Use it as a guide, and trust field signs and the PDF.' : "Placed from the PDF's GPS data and cut to the official boundary."} The full map shows the area types and symbols this refuge uses.</p></section>` : FULL_MAP[r.id] ? `<section><div class="warn">${esc(FULL_MAP[r.id].note)}</div><div class="btns"><button class="btn main" id="fullkey">See full map and its key</button></div></section>` : `<div class="warn">The hunt map PDF has no GPS data, so it isn't laid on the imagery. ${focusedFacilities(r.id).length ? 'Official blind and parking points are shown instead. Numbered ponds and zones are in the PDF.' : 'The official boundary is drawn instead. Zones are in the PDF.'}</div>`}
+      <div class="kicker">Official PDFs</div>
+      <div class="btns">
+        ${huntMaps.map((m, i) => link(m.url, m.label, i === 0 ? 'btn main' : 'btn')).join('')}
+        ${otherMaps.map((m, i) => link(m.url, m.label, !huntMaps.length && i === 0 ? 'btn main' : 'btn')).join('')}
+        ${link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(r.name.replace(/\s*\(.*\)/, '') + ' California'), 'Directions', 'btn')}
+      </div>
+      ${!huntMaps.length ? `<p class="quiet">We could not find a dedicated waterfowl hunt map online for this unit, so this is the general area map. Ask the area for the hunt zones.</p>` : ''}`)}
+    ${sec('getin', 'Getting in without a reservation', VAC[r.vacType].label, oddsBlock(r))}
+    ${sec('resv', 'Reservation odds', `1 in ${r.odds.one} last season`, `<div class="stats">
+        <div><b>1 in ${r.odds.one}</b><span>Season odds</span></div>
+        <div><b>${num(r.odds.apps)}</b><span>Applications</span></div>
+        <div><b>${num(r.odds.res)}</b><span>Reservations</span></div>
+      </div>
+      <p class="quiet">2025-26 regular season, all hunt days combined. CDFW doesn't publish these by date, but says Saturdays are harder to draw, and Wednesdays and Sundays easier.</p>`)}
+    ${sec('calls', 'Groups and call times', r.checkin ? 'Who gets called, and when' : 'Call the area', callsBlock(r, hunt))}
+    ${sec('plan', 'Your hunt timeline', fmt(hunt), `
       <div><label for="huntdate">Hunt date</label><input type="date" id="huntdate" value="${huntISO}"></div>
       <div class="card"><ol class="tl">${timeline(r, hunt)}</ol></div>
-      <p class="quiet">Check-in clock times are our estimates from sunrise. Confirm hunt days and times with the area at ${esc(r.phone)}.</p>
-    </section>
-    ${r.party ? `<section><h3>Party size</h3><p>${esc(r.party)}</p></section>` : ''}
-    <section><h3>Latest lottery list</h3>${drawBlock(r)}</section>
-    <section><h3>Contact and sources</h3>
-      <p>Phone: <span style="user-select:all">${esc(r.phone)}</span></p>
-      <div class="btns">${link(r.page, 'Area page', 'btn')}${link(CLOSURES_URL, 'Closures', 'btn')}${link(INFO_URL, 'Reservation table', 'btn')}</div>
-    </section>
+      <p class="quiet">Check-in clock times are our estimates from sunrise. Confirm hunt days and times with the area at ${esc(r.phone)}.</p>`)}
+    ${sec('rules', 'Party size and bikes', `Regular bikes: ${(BIKES[r.id] || STATE_BIKE).label.toLowerCase()}`, `${r.party ? `<section><h3>Party size</h3><p>${esc(r.party)}</p></section>` : ''}${bikeBlock(r)}`)}
+    ${sec('list', 'Latest lottery list', listHint(r), drawBlock(r))}
+    ${sec('birds', 'Birds and species', `${birdsShort(r)} birds per hunter${seasonStats(r) ? '' : ', last yr'}`, birdPage(r))}
+    ${sec('weather', 'Weather', 'Wind, visibility and forecast', '<div id="pane-weather" class="inner-col"><p class="quiet">Loading the forecast…</p></div>')}
+    ${sec('flood', 'Flood maps', FLOOD[r.id] ? (FLOOD[r.id].some(m => m.year) ? `Older plan, ${FLOOD[r.id][0].year}` : '2026 plan') : 'Not found online', `<div id="pane-flood" class="inner-col">${floodPage(r)}</div>`)}
+    ${sec('contact', 'Contact and sources', r.phone, `<p>Phone: <span style="user-select:all">${esc(r.phone)}</span></p>
+      <div class="btns">${link(r.page, 'Area page', 'btn')}${link(CLOSURES_URL, 'Closures', 'btn')}${link(INFO_URL, 'Reservation table', 'btn')}</div>`)}
     </div>
   </div>`;
   el.hidden = false;
@@ -1195,17 +1259,33 @@ function openDetail(id, keepScroll){
   el.querySelectorAll('[data-bv]').forEach(b => { b.onclick = () => { blindView = b.dataset.bv; openDetail(id, true); }; });
   const bd = $('#blindday'); if (bd) bd.onchange = () => { blindDate = bd.value; openDetail(id, true); };
   el.querySelectorAll('[data-fimg]').forEach(b => { b.onclick = () => { const v = $('#viewer'); v.innerHTML = `<button class="btn main" id="vclose">Close</button><img src="${esc(b.dataset.fimg)}" alt="${esc(b.dataset.flabel)}">`; v.hidden = false; $('#vclose').onclick = () => { v.hidden = true; }; }; });
-  el.querySelectorAll('[data-pane]').forEach(b => { b.onclick = () => { detailPane = b.dataset.pane; openDetail(id, true); }; });
+  el.querySelectorAll('details.sec').forEach(d => {
+    let skip = d.open;
+    d.addEventListener('toggle', () => {
+      /* The browser also fires this for sections drawn open, and for ones already replaced. */
+      if (!d.isConnected) return;
+      if (skip && d.open) { skip = false; return; }
+      skip = false;
+      if (d.open) {
+        detailPane = d.dataset.sec;
+        el.querySelectorAll('details.sec').forEach(o => { if (o !== d && o.open) o.open = false; });
+        if (d.dataset.sec !== 'maps') setSheet('full');
+        if (d.dataset.sec === 'weather') showWeather(r);
+        setTimeout(() => d.scrollIntoView({block:'start'}), 280);
+      } else if (detailPane === d.dataset.sec) detailPane = null;
+    });
+  });
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
   setFocus(id);
   if (detailPane === 'weather') showWeather(r);
   if (!keepScroll) focusRefuge(r);
+  if (!keepScroll && detailPane) setTimeout(() => { setSheet('full'); const o = el.querySelector('details.sec[open]'); if (o) o.scrollIntoView({block:'start'}); }, 350);
   updateShoot();
   $('#huntdate').onchange = e => { if (e.target.value) { huntISO = e.target.value; weatherDay = null; openDetail(id, true); } };
 }
 function closeDetail(){
-  $('#detail').hidden = true; selected = null;
+  $('#detail').hidden = true; selected = null; detailPane = null;
   setTab(document.querySelector('nav button[aria-selected="true"]').dataset.tab);
   Object.keys(markers).forEach(k => markers[k].setIcon(pinIcon(REFUGES.find(z => z.id === k))));
   setFocus(null);
@@ -1327,7 +1407,7 @@ function renderAll(){
 }
 document.addEventListener('click', e => {
   const tab = e.target.closest('nav button'); if (tab) { setTab(tab.dataset.tab); return; }
-  const row = e.target.closest('.row'); if (row) { detailPane = row.dataset.birds ? 'birds' : 'plan'; setTab('map'); openDetail(row.dataset.id); return; }
+  const row = e.target.closest('.row'); if (row) { detailPane = row.dataset.birds ? 'birds' : null; setTab('map'); openDetail(row.dataset.id); return; }
 });
 
 drawLegend(null);
