@@ -1019,7 +1019,36 @@ const LOTTERY_CALL = {
   merced:'No refills. Lottery entries are called only to fill reservation no-shows.'
 };
 const LINE_CALL = 'There is no lottery. The first-come line is called after reservations are done.';
+/* Reservation groups per hunt day, from CDFW figures.
+   avg: 2025-26 regular-season reservations / hunt days (about 44, or 29 for Wed and Sat areas). late: 2025-26 military hunt, per day,
+   left out where it didn't fill or wasn't offered. full: 2021 quota table when fully flooded. dis: mobility-impaired, per day. sites: listed blinds and ponds. */
+const GROUPS = {
+  sacramento:{avg:35, late:54, full:59, dis:3, sites:50}, delevan:{avg:30, late:39, full:39, dis:3, sites:29}, colusa:{avg:18, late:21, full:23, dis:2, sites:13}, sutter:{avg:10, late:17, full:17, dis:1, sites:12},
+  graylodge:{avg:85, late:90, full:105, dis:3}, howard:{avg:14, full:22, dis:1}, littledry:{avg:15, late:21, full:26, dis:3}, llano:{avg:11, full:17},
+  yolo:{avg:35, late:35, full:31, dis:2}, grizzly:{avg:221, full:225, dis:1}, joice:{avg:2},
+  sanluis:{avg:56, late:55, full:55}, kesterson:{avg:29, late:32, full:32, dis:2, sites:34}, freitasn:{avg:13, late:16, full:15}, freitass:{avg:10, late:15, full:13}, bearcreek:{late:12, full:14},
+  merced:{avg:14, late:17, full:17, dis:1}, saltslough:{avg:27, late:25, full:26, dis:1}, gadwall:{avg:16, late:15, full:16, dis:2}, china:{avg:21, late:25, full:14},
+  losbanos:{avg:57, late:60, full:67, dis:2}, volta:{avg:57, late:60, full:67}, mendota:{avg:102, full:100, dis:7}, kern:{avg:10, late:12, full:15, dis:1}, sanjacinto:{avg:52, late:50, full:50, dis:2}, wister:{avg:102, late:100, full:100, dis:4}
+};
+const GROUPS_B = {ashcreek:18, buttevalley:5, dakin:11, fleming:14, shasta:7, willow:13};
+function groupsBlock(r){
+  const STATS_URL_G = STATS_URL, QUOTA_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=195105&inline';
+  if (GROUPS_B[r.id] != null) return `<section><h3>Reservation groups</h3><p>About <b>${GROUPS_B[r.id]} groups</b> on an opening weekend, the 2016-20 average. Call ${esc(r.phone)} for this season's number.</p><p class="quiet">Source: ${link(QUOTA_URL, 'CDFW quota table')}.</p></section>`;
+  const g = GROUPS[r.id]; if (!g) return '';
+  const nums = [g.avg, g.late].filter(v => v != null), lo = Math.min(...nums), hi = Math.max(...nums);
+  const head = lo === hi ? `About ${lo}` : `About ${lo} to ${hi}`;
+  const lineWord = r.vacType === 'line' ? 'the first-come line' : r.vacType === 'none' ? null : 'the lottery';
+  return `<section><h3>Reservation groups</h3><div class="card"><div class="dayodds">${head} groups</div><p>called per hunt day${lineWord ? `, ahead of ${lineWord}` : ''}. One reservation is one group.</p></div>
+    <div class="stats"><div><b>${g.avg != null ? g.avg : '–'}</b><span>Season average</span></div><div><b>${g.late != null ? g.late : '–'}</b><span>Late-season hunt</span></div><div><b>${g.full != null ? g.full : '–'}</b><span>Full quota</span></div></div>
+    ${g.sites ? `<p>This refuge has ${g.sites} listed blinds and ponds${r.id === 'kesterson' ? '' : ', plus free roam'}.</p>` : ''}
+    ${lineWord === 'the lottery' ? '<p>To see where you stand, add your lottery number to the reservation groups. No-shows can move you up.</p>' : ''}
+    ${g.dis ? `<p class="quiet">About ${g.dis} more mobility-impaired ${g.dis === 1 ? 'group' : 'groups'} a day ${g.dis === 1 ? 'is' : 'are'} drawn separately.</p>` : ''}
+    <p class="quiet">Estimates, not a count for any one morning. Numbers change with water levels, and some units open late. Season average and late-season hunt are from 2025-26. Full quota is from 2021. Sources: ${link(STATS_URL_G, '2025-26 statistics')} and ${link(QUOTA_URL, 'CDFW quota table')}. Ask the check station for today's count.</p></section>`;
+}
 function callsBlock(r, hunt){
+  return groupsBlock(r) + callsTable(r, hunt);
+}
+function callsTable(r, hunt){
   if (r.vacType === 'call' || !r.checkin) return `<section><h3>Morning call times</h3><p>CDFW's table covers Type A areas only. Call ${esc(r.phone)} for this area's times.</p></section>`;
   let shoot = null;
   try { shoot = roundTo5(sunriseUTC(hunt, r.lat, r.lng) - 30 * 6e4); } catch (e) {}
