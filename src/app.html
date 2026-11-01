@@ -83,6 +83,9 @@ ul.signup b{display:block;font-weight:700}
 .pin.sel{background:#fff;box-shadow:0 0 0 3px var(--accent)}
 .leaflet-tooltip.pinlabel{background:rgba(0,0,0,.92);border:0;border-radius:5px;color:var(--ink);box-shadow:none;font:700 14px var(--body);padding:2px 7px;display:none}
 .leaflet-tooltip.pinlabel::before{display:none}
+.leaflet-tooltip.pinlabel{cursor:pointer;pointer-events:auto;line-height:1.2}
+.pl-name,.pl-avg{display:block}
+.pl-avg{font-weight:600;font-size:12px;color:var(--accent)}
 .show-labels .leaflet-tooltip.pinlabel{display:block}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink);border-radius:8px}
 .leaflet-popup-content{margin:10px 12px;font:400 14px var(--body)}
@@ -447,6 +450,11 @@ function refugeBounds(id){
   const ov = overlaysFor(id)[0];
   return ov ? overlayBounds(ov) : null;
 }
+function pinLabel(r){
+  const s = seasonStats(r), l = lastStats(r);
+  const avg = s ? `${s.avg.toFixed(1)} birds per hunter` : l ? `${l.avg.toFixed(1)} birds per hunter last yr` : 'No bird average yet';
+  return `<span class="pl-name">${esc(r.name.replace(/\s*\(.*\)/, ''))}</span><span class="pl-avg">${esc(avg)}</span>`;
+}
 function initMap(){
   if (typeof L === 'undefined') { $('#map').innerHTML = '<p class="pad">The map library did not load. The refuge list still works.</p>'; return; }
   map = L.map('map', {zoomSnap:0.5, zoomControl:false, attributionControl:false, maxZoom:19, preferCanvas:false, scrollWheelZoom:true, touchZoom:true});
@@ -462,7 +470,7 @@ function initMap(){
   map.fitBounds(CA_BOUNDS, fitOpts());
   REFUGES.forEach(r => {
     const m = L.marker([r.lat, r.lng], {icon:pinIcon(r), title:r.name, alt:r.name, riseOnHover:true}).addTo(map);
-    m.bindTooltip(r.name.replace(/\s*\(.*\)/, ''), {permanent:true, direction:'right', offset:[10, 0], className:'pinlabel'});
+    m.bindTooltip(pinLabel(r), {permanent:true, interactive:true, direction:'right', offset:[10, 0], className:'pinlabel'});
     m.on('click', () => { setTab('map'); openDetail(r.id); });
     markers[r.id] = m;
   });
@@ -1313,6 +1321,7 @@ function setTab(t){
 function renderAll(){
   renderDraws();
   renderList();
+  REFUGES.forEach(r => { if (markers[r.id]) markers[r.id].setTooltipContent(pinLabel(r)); });
   renderBirds();
   if (selected) openDetail(selected, true);
 }
