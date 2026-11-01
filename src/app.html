@@ -165,6 +165,17 @@ body.dropping #map,body.dropping .leaflet-grab{cursor:crosshair}
 textarea{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;resize:vertical}
 details.hunt>summary{align-items:center}
 .logn{white-space:pre-wrap;overflow-wrap:anywhere}
+#map{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#holdring{position:fixed;z-index:1500;width:64px;height:64px;margin:-32px 0 0 -32px;pointer-events:none}
+#holdring svg{width:100%;height:100%;transform:rotate(-90deg)}
+#holdring circle{fill:rgba(0,0,0,.35);stroke:var(--accent);stroke-width:4;stroke-dasharray:120;stroke-dashoffset:120;animation:holdfill 3s linear forwards}
+@keyframes holdfill{to{stroke-dashoffset:0}}
+#wpprompt{position:absolute;inset:0;z-index:1800;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:16px}
+#wpprompt .card{width:min(340px,100%);display:flex;flex-direction:column;gap:10px;border:1px solid var(--accent)}
+#wpprompt .btn{flex:1;text-align:center;min-height:44px}
+.logpin.wp-plain{width:20px;height:20px;background:var(--accent)}
+.seasontile{display:flex;align-items:center;gap:14px}
+.seasontile b{display:block;font:600 18px var(--display);letter-spacing:.03em;text-transform:uppercase}
 .wx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .wx svg{width:64px;height:64px;color:var(--accent)}
 .wx .big{font-size:44px}
@@ -237,7 +248,9 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
     </div>
   </div>
   <div id="viewer" hidden role="dialog" aria-label="Full hunt map"></div>
-  <div id="dropbar" hidden role="status"><span>Tap the map where you hunted</span><button class="btn" id="dropcancel">Cancel</button></div>
+  <div id="dropbar" hidden role="status"><span>Press and hold the map for 3 seconds</span><button class="btn" id="dropcancel">Cancel</button></div>
+  <div id="holdring" hidden aria-hidden="true"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/></svg></div>
+  <div id="wpprompt" hidden role="dialog" aria-modal="true" aria-labelledby="wpq"><div class="card"><h3 id="wpq">Log this as a hunt?</h3><p id="wpwhere"></p><div class="btns"><button class="btn main" id="wpyes">Yes</button><button class="btn" id="wpno">No</button></div><p class="quiet">No keeps the waypoint on your map.</p></div></div>
   <div id="note" hidden role="status"></div>
   <div id="sheet">
     <div id="legend" aria-label="Marker legend"></div>
@@ -506,7 +519,7 @@ function initMap(){
   });
   const labels = () => $('#map').classList.toggle('show-labels', map.getZoom() >= 9);
   map.on('zoomend', labels); labels();
-  map.on('click', e => { if (dropping) { placeWaypoint(e.latlng); return; } if (selected && !insideRefuge(selected, e.latlng)) { closeDetail(); setTab('map'); } });
+  map.on('click', e => { if (dropping || Date.now() < holdSuppress) return; if (selected && !insideRefuge(selected, e.latlng)) { closeDetail(); setTab('map'); } });
   map.on('moveend', updateShoot); updateShoot();
   setInterval(updateShoot, 60000);
   new ResizeObserver(() => map.invalidateSize()).observe($('#map'));
@@ -1406,7 +1419,8 @@ function findTicket(raw){
 }
 
 /* ---------- hunt log: saved only in this browser, never uploaded ---------- */
-const LOG_KEY = 'refugerat.hunts.v1';
+const LOG_KEY = 'refugerat.hunts.v1', WP_KEY = 'refugerat.waypoints.v1';
+let holdSuppress = 0, pendingSpot = null, wpLayer = null;
 const DUCK_LIST = ['Mallard','Gadwall','Wigeon','Green-winged teal','Cinnamon teal','Blue-winged teal','Pintail','Shoveler','Wood duck','Ring-necked duck','Scaup','Canvasback','Redhead','Bufflehead','Goldeneye','Ruddy duck','Other duck'];
 const GOOSE_LIST = ['Snow goose',"Ross's goose",'White-fronted goose','Canada goose','Cackling goose','Other goose'];
 let dropping = false, draft = null, logPins = null, draftPin = null, logStoreOK = true, wxToken = 0, logMsg = '', confirmDelete = null;
@@ -1418,6 +1432,77 @@ function storeHunts(list){
 }
 const birdTotal = h => Object.values(h.birds || {}).reduce((t, n) => t + n, 0);
 const refugeName = id => (REFUGES.find(r => r.id === id) || {name:'Unknown refuge'}).name;
+function loadWaypoints(){ try { return JSON.parse(localStorage.getItem(WP_KEY)) || []; } catch (e) { return []; } }
+function storeWaypoints(list){ try { localStorage.setItem(WP_KEY, JSON.stringify(list)); return true; } catch (e) { return false; } }
+function refugeAt(ll){
+  const pt = L.latLng(ll), inside = REFUGES.find(r => { try { return insideRefuge(r.id, pt); } catch (e) { return false; } });
+  if (inside) return inside.id;
+  return REFUGES.map(r => [r.id, map.distance(pt, markers[r.id] ? markers[r.id].getLatLng() : [r.lat, r.lng])]).sort((x, y) => x[1] - y[1])[0][0];
+}
+function drawWaypoints(){
+  if (!map) return;
+  if (wpLayer) map.removeLayer(wpLayer);
+  wpLayer = L.layerGroup(loadWaypoints().map(w => L.marker(w.spot, {icon:L.divIcon({className:'', iconSize:[20, 20], iconAnchor:[10, 10], html:'<div class="logpin wp-plain"></div>'}), title:'Saved waypoint'}).bindPopup(`<b>Saved waypoint</b>${esc(refugeName(w.refuge))}<br>${esc(fmt(fromISO(w.date)))}<div class="btns" style="margin-top:8px"><button class="btn main" data-wplog="${w.id}">Log as hunt</button><button class="btn" data-wpdel="${w.id}">Delete</button></div>`))).addTo(map);
+}
+function startHuntAt(spot, refuge, date, wpId){
+  draft = newDraft();
+  draft.refuge = refuge; draft.spot = spot; draft.wpId = wpId || null; if (date) draft.date = date;
+  logMsg = '';
+  setTab('log');
+  showDraftPin();
+  renderLog();
+  setSheet('full');
+  $('#logview').scrollTop = 0;
+  fetchHuntWeather();
+}
+function holdFired(ll){
+  const spot = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)];
+  holdSuppress = Date.now() + 800;
+  try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) {}
+  if (draft && (dropping || !$('#logview').hidden)) { placeWaypoint(ll); return; }
+  pendingSpot = {spot, refuge:refugeAt(ll)};
+  $('#wpwhere').textContent = `Waypoint dropped near ${refugeName(pendingSpot.refuge)}.`;
+  $('#wpprompt').hidden = false;
+  showPendingPin(spot);
+}
+let pendingPin = null;
+function showPendingPin(spot){ if (pendingPin) map.removeLayer(pendingPin); pendingPin = spot ? L.marker(spot, {icon:logPinIcon(), interactive:false}).addTo(map) : null; }
+function initHold(){
+  const box = $('#map'), ring = $('#holdring');
+  let timer = null, sx = 0, sy = 0, pid = null;
+  const cancel = () => { clearTimeout(timer); timer = null; pid = null; ring.hidden = true; };
+  box.addEventListener('pointerdown', e => {
+    if (timer) { cancel(); return; } /* a second finger means pinch */
+    if (e.button > 0 || (!dropping && e.target.closest('.leaflet-marker-icon,.leaflet-tooltip,.leaflet-popup,.leaflet-control'))) return;
+    sx = e.clientX; sy = e.clientY; pid = e.pointerId;
+    ring.style.left = `${sx}px`; ring.style.top = `${sy}px`;
+    ring.hidden = false;
+    const c = ring.querySelector('circle'); c.style.animation = 'none'; void c.getBoundingClientRect(); c.style.animation = '';
+    timer = setTimeout(() => {
+      const r = box.getBoundingClientRect(), ll = map.containerPointToLatLng([sx - r.left, sy - r.top]);
+      cancel();
+      holdFired(ll);
+    }, 3000);
+  });
+  addEventListener('pointermove', e => { if (timer && e.pointerId === pid && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); });
+  addEventListener('pointerup', e => { if (e.pointerId === pid) cancel(); });
+  addEventListener('pointercancel', e => { if (e.pointerId === pid) cancel(); });
+  map.on('zoomstart', cancel);
+  box.addEventListener('contextmenu', e => e.preventDefault());
+  $('#wpyes').onclick = () => { const p = pendingSpot; pendingSpot = null; $('#wpprompt').hidden = true; showPendingPin(null); startHuntAt(p.spot, p.refuge); };
+  $('#wpno').onclick = () => {
+    const p = pendingSpot; pendingSpot = null; $('#wpprompt').hidden = true; showPendingPin(null);
+    const list = loadWaypoints(); list.push({id:String(Date.now()), spot:p.spot, refuge:p.refuge, date:toISO(today())});
+    if (!storeWaypoints(list)) flash("This browser wouldn't save the waypoint.");
+    drawWaypoints();
+  };
+  document.addEventListener('click', e => {
+    const lg = e.target.closest('[data-wplog]'), del = e.target.closest('[data-wpdel]');
+    if (lg) { const w = loadWaypoints().find(x => x.id === lg.dataset.wplog); map.closePopup(); if (w) startHuntAt(w.spot, w.refuge, w.date, w.id); }
+    if (del) { storeWaypoints(loadWaypoints().filter(x => x.id !== del.dataset.wpdel)); map.closePopup(); drawWaypoints(); }
+  });
+  drawWaypoints();
+}
 function newDraft(){
   return {id:null, refuge:selected || (loadHunts()[0] || {}).refuge || REFUGES[0].id, date:toISO(today()), notes:'', birds:{}, spot:null, wx:{}, wxNote:''};
 }
@@ -1444,6 +1529,10 @@ function stepper(n){
   const c = (draft.birds || {})[n] || 0;
   return `<div class="stp"><span>${esc(n)}</span><div><button type="button" class="tool" data-minus="${esc(n)}" aria-label="One fewer ${esc(n)}">−</button><b data-count="${esc(n)}">${c}</b><button type="button" class="tool" data-plus="${esc(n)}" aria-label="One more ${esc(n)}">+</button></div></div>`;
 }
+/* A season runs August through July, so a January hunt counts toward the season that started the prior fall. */
+function seasonStart(){ const t = today(); return t.getMonth() >= 7 ? t.getFullYear() : t.getFullYear() - 1; }
+const seasonLabel = () => `${seasonStart()}-${String(seasonStart() + 1).slice(2)}`;
+const seasonBirds = hunts => hunts.filter(h => h.date >= `${seasonStart()}-08-01` && h.date < `${seasonStart() + 1}-08-01`).reduce((t, h) => t + birdTotal(h), 0);
 function renderLog(){
   const box = $('#logview'); if (!box) return;
   const hunts = loadHunts().sort((x, y) => y.date.localeCompare(x.date));
@@ -1453,6 +1542,8 @@ function renderLog(){
     box.innerHTML = `<div class="pad"><div><h2>Hunt log</h2><p class="quiet">Saved only on this device, not on our servers. To fill in weather, the app sends your hunt spot to the National Weather Service.</p></div>${store}
       ${logMsg ? `<div class="warn">${esc(logMsg)}</div>` : ''}
       <button class="btn main" id="lognew">Log a hunt</button>
+      <p class="quiet">Or press and hold anywhere on the map for 3 seconds to drop a waypoint.</p>
+      <div class="card seasontile"><div class="big">${seasonBirds(hunts)}</div><div><b>Seasonal Bird Count</b><span class="quiet">${esc(seasonLabel())} season</span></div></div>
       ${hunts.length ? `<div class="stats"><div><b>${hunts.length}</b><span>${hunts.length === 1 ? 'Hunt' : 'Hunts'}</span></div><div><b>${total}</b><span>Birds</span></div><div><b>${(total / hunts.length).toFixed(1)}</b><span>Birds per hunt</span></div></div>` : '<p>No hunts yet. Log your first one to save your spot, notes, birds and the weather.</p>'}
       <div class="secs">${hunts.map(huntCard).join('')}</div>
       <section><h3>Backup</h3><p class="quiet">Clearing your browser data deletes your log, and it won't move to a new phone on its own. Save a backup file now and then.</p><div class="btns"><button class="btn" id="logsave">Save backup</button><label class="btn" for="logload" style="margin:0">Restore backup</label><input type="file" id="logload" accept="application/json,.json" hidden></div></section></div>`;
@@ -1463,7 +1554,7 @@ function renderLog(){
   box.innerHTML = `<div class="pad"><div><button class="back" id="logback">← Back to log</button><h2>${draft.id ? 'Edit hunt' : 'Log a hunt'}</h2></div>${store}
     <section><div><label for="lref">Refuge</label><select id="lref">${REFUGES.map(r => `<option value="${r.id}"${r.id === draft.refuge ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
     <div><label for="ldate">Hunt date</label><input type="date" id="ldate" value="${draft.date}"></div></section>
-    <section><h3>Waypoint</h3><p>${draft.spot ? `Saved at ${draft.spot[0].toFixed(5)}, ${draft.spot[1].toFixed(5)}` : 'Mark where you hunted.'}</p><div class="btns"><button class="btn main" id="ldrop">${draft.spot ? 'Move waypoint' : 'Drop waypoint'}</button><button class="btn" id="lgps">Use my location</button>${draft.spot ? '<button class="btn" id="lclear">Remove</button>' : ''}</div></section>
+    <section><h3>Waypoint</h3><p>${draft.spot ? `Saved at ${draft.spot[0].toFixed(5)}, ${draft.spot[1].toFixed(5)}` : 'Press and hold the map for 3 seconds where you hunted.'}</p><div class="btns"><button class="btn main" id="ldrop">${draft.spot ? 'Move waypoint' : 'Drop waypoint'}</button><button class="btn" id="lgps">Use my location</button>${draft.spot ? '<button class="btn" id="lclear">Remove</button>' : ''}</div></section>
     <section><h3>Birds</h3><div class="big" id="ltotal">${birdTotal(draft)}</div><p class="quiet">Total birds</p><div class="kicker">Ducks</div><div class="stps">${DUCK_LIST.map(stepper).join('')}</div><div class="kicker">Geese</div><div class="stps">${GOOSE_LIST.map(stepper).join('')}</div></section>
     <section><h3>Weather</h3><p class="quiet" id="lwxnote">${esc(draft.wxNote || w.source || '')}</p>
       <div class="wxf"><div><label for="lwind">Wind (mph)</label><input type="text" inputmode="numeric" id="lwind" value="${esc(w.wind ?? '')}"></div><div><label for="lgust">Gusts (mph)</label><input type="text" inputmode="numeric" id="lgust" value="${esc(w.gust ?? '')}"></div>
@@ -1486,13 +1577,14 @@ function bindLogList(hunts){
   }; });
   b.querySelectorAll('[data-lshow]').forEach(x => { x.onclick = () => { const h = hunts.find(i => i.id === x.dataset.lshow); setSheet('peek'); setTimeout(() => { map.setView(h.spot, 15); }, 280); }; });
   $('#logsave').onclick = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(loadHunts(), null, 1)], {type:'application/json'}));
+    const url = URL.createObjectURL(new Blob([JSON.stringify({hunts:loadHunts(), waypoints:loadWaypoints()}, null, 1)], {type:'application/json'}));
     const l = document.createElement('a'); l.href = url; l.download = `refuge-rat-log-${toISO(today())}.json`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
   $('#logload').onchange = async e => {
     const file = e.target.files[0]; if (!file) return;
     try {
-      const incoming = JSON.parse(await file.text());
+      const parsed = JSON.parse(await file.text()), incoming = Array.isArray(parsed) ? parsed : parsed.hunts;
+      if (Array.isArray(parsed.waypoints)) { const wps = {}; loadWaypoints().concat(parsed.waypoints).forEach(w => { if (w.id && w.spot) wps[w.id] = w; }); storeWaypoints(Object.values(wps)); drawWaypoints(); }
       if (!Array.isArray(incoming) || incoming.some(h => !h.id || !h.date || !h.refuge)) throw 0;
       const all = {}; loadHunts().concat(incoming).forEach(h => { all[h.id] = h; });
       storeHunts(Object.values(all)); logMsg = `Restored ${incoming.length} ${incoming.length === 1 ? 'hunt' : 'hunts'}.`;
@@ -1530,6 +1622,7 @@ function bindLogForm(){
     const i = list.findIndex(h => h.id === rec.id);
     if (i >= 0) list[i] = rec; else list.push(rec);
     if (!storeHunts(list)) { flash("This browser wouldn't save the hunt."); renderLog(); return; }
+    if (draft.wpId) { storeWaypoints(loadWaypoints().filter(w => w.id !== draft.wpId)); drawWaypoints(); }
     logMsg = 'Hunt saved.'; draft = null; wxToken++; clearDraftPin(); renderLog(); showLogPins(true); $('#logview').scrollTop = 0;
   };
 }
@@ -1634,7 +1727,7 @@ document.addEventListener('click', e => {
 
 drawLegend(null);
 $('#dropcancel').onclick = () => { stopDrop(); setSheet('full'); };
-initSheet(); initControls(); renderList(); renderHow(); renderAll(); initMap();
+initSheet(); initControls(); renderList(); renderHow(); renderAll(); initMap(); if (map) initHold();
 
 /* Pick up newer data without a refresh: every 2 minutes from 8 to 9:15 PM Pacific, when draw results post, and every 15 otherwise. */
 function drawHour(){
