@@ -168,7 +168,7 @@ details.hunt>summary{align-items:center}
 #map{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 #holdring{position:fixed;z-index:1500;width:64px;height:64px;margin:-32px 0 0 -32px;pointer-events:none}
 #holdring svg{width:100%;height:100%;transform:rotate(-90deg)}
-#holdring circle{fill:rgba(0,0,0,.35);stroke:var(--accent);stroke-width:4;stroke-dasharray:120;stroke-dashoffset:120;animation:holdfill 3s linear forwards}
+#holdring circle{fill:rgba(0,0,0,.35);stroke:var(--accent);stroke-width:4;stroke-dasharray:120;stroke-dashoffset:120;animation:holdfill 1.5s linear forwards}
 @keyframes holdfill{to{stroke-dashoffset:0}}
 #wpprompt{position:absolute;inset:0;z-index:1800;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:16px}
 #wpprompt .card{width:min(340px,100%);display:flex;flex-direction:column;gap:10px;border:1px solid var(--accent)}
@@ -248,7 +248,7 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;f
     </div>
   </div>
   <div id="viewer" hidden role="dialog" aria-label="Full hunt map"></div>
-  <div id="dropbar" hidden role="status"><span>Press and hold the map for 3 seconds</span><button class="btn" id="dropcancel">Cancel</button></div>
+  <div id="dropbar" hidden role="status"><span>Press and hold the map for 1.5 seconds</span><button class="btn" id="dropcancel">Cancel</button></div>
   <div id="holdring" hidden aria-hidden="true"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/></svg></div>
   <div id="wpprompt" hidden role="dialog" aria-modal="true" aria-labelledby="wpq"><div class="card"><h3 id="wpq">Log this as a hunt?</h3><p id="wpwhere"></p><div class="btns"><button class="btn main" id="wpyes">Yes</button><button class="btn" id="wpno">No</button></div><p class="quiet">No keeps the waypoint on your map.</p></div></div>
   <div id="note" hidden role="status"></div>
@@ -672,11 +672,11 @@ function drawLegend(id){
   $('#legendbtn').onclick = () => { legendOpen = !legendOpen; drawLegend(id); };
 }
 let focusLayer = null;
-/* Selected refuge: its pin and boundary only. No selection: every refuge. */
+/* Selected refuge: its boundary only, with no pin or name tag. No selection: every refuge. */
 function setFocus(id){
   document.body.classList.toggle('focused', !!id);
   drawLegend(id);
-  REFUGES.forEach(r => { const m = markers[r.id]; if (!m || !map) return; if (!id || r.id === id) m.addTo(map); else m.remove(); });
+  REFUGES.forEach(r => { const m = markers[r.id]; if (!m || !map) return; if (!id) m.addTo(map); else m.remove(); });
   if (!map) return;
   if (focusLayer) { map.removeLayer(focusLayer); focusLayer = null; }
   const on = $('#l-bounds').checked;
@@ -1482,7 +1482,7 @@ function initHold(){
       const r = box.getBoundingClientRect(), ll = map.containerPointToLatLng([sx - r.left, sy - r.top]);
       cancel();
       holdFired(ll);
-    }, 3000);
+    }, 1500);
   });
   addEventListener('pointermove', e => { if (timer && e.pointerId === pid && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); });
   addEventListener('pointerup', e => { if (e.pointerId === pid) cancel(); });
@@ -1542,7 +1542,7 @@ function renderLog(){
     box.innerHTML = `<div class="pad"><div><h2>Hunt log</h2><p class="quiet">Saved only on this device, not on our servers. To fill in weather, the app sends your hunt spot to the National Weather Service.</p></div>${store}
       ${logMsg ? `<div class="warn">${esc(logMsg)}</div>` : ''}
       <button class="btn main" id="lognew">Log a hunt</button>
-      <p class="quiet">Or press and hold anywhere on the map for 3 seconds to drop a waypoint.</p>
+      <p class="quiet">Or press and hold anywhere on the map for 1.5 seconds to drop a waypoint.</p>
       <div class="card seasontile"><div class="big">${seasonBirds(hunts)}</div><div><b>Seasonal Bird Count</b><span class="quiet">${esc(seasonLabel())} season</span></div></div>
       ${hunts.length ? `<div class="stats"><div><b>${hunts.length}</b><span>${hunts.length === 1 ? 'Hunt' : 'Hunts'}</span></div><div><b>${total}</b><span>Birds</span></div><div><b>${(total / hunts.length).toFixed(1)}</b><span>Birds per hunt</span></div></div>` : '<p>No hunts yet. Log your first one to save your spot, notes, birds and the weather.</p>'}
       <div class="secs">${hunts.map(huntCard).join('')}</div>
@@ -1554,7 +1554,7 @@ function renderLog(){
   box.innerHTML = `<div class="pad"><div><button class="back" id="logback">← Back to log</button><h2>${draft.id ? 'Edit hunt' : 'Log a hunt'}</h2></div>${store}
     <section><div><label for="lref">Refuge</label><select id="lref">${REFUGES.map(r => `<option value="${r.id}"${r.id === draft.refuge ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
     <div><label for="ldate">Hunt date</label><input type="date" id="ldate" value="${draft.date}"></div></section>
-    <section><h3>Waypoint</h3><p>${draft.spot ? `Saved at ${draft.spot[0].toFixed(5)}, ${draft.spot[1].toFixed(5)}` : 'Press and hold the map for 3 seconds where you hunted.'}</p><div class="btns"><button class="btn main" id="ldrop">${draft.spot ? 'Move waypoint' : 'Drop waypoint'}</button><button class="btn" id="lgps">Use my location</button>${draft.spot ? '<button class="btn" id="lclear">Remove</button>' : ''}</div></section>
+    <section><h3>Waypoint</h3><p>${draft.spot ? `Saved at ${draft.spot[0].toFixed(5)}, ${draft.spot[1].toFixed(5)}` : 'Press and hold the map for 1.5 seconds where you hunted.'}</p><div class="btns"><button class="btn main" id="ldrop">${draft.spot ? 'Move waypoint' : 'Drop waypoint'}</button><button class="btn" id="lgps">Use my location</button>${draft.spot ? '<button class="btn" id="lclear">Remove</button>' : ''}</div></section>
     <section><h3>Birds</h3><div class="big" id="ltotal">${birdTotal(draft)}</div><p class="quiet">Total birds</p><div class="kicker">Ducks</div><div class="stps">${DUCK_LIST.map(stepper).join('')}</div><div class="kicker">Geese</div><div class="stps">${GOOSE_LIST.map(stepper).join('')}</div></section>
     <section><h3>Weather</h3><p class="quiet" id="lwxnote">${esc(draft.wxNote || w.source || '')}</p>
       <div class="wxf"><div><label for="lwind">Wind (mph)</label><input type="text" inputmode="numeric" id="lwind" value="${esc(w.wind ?? '')}"></div><div><label for="lgust">Gusts (mph)</label><input type="text" inputmode="numeric" id="lgust" value="${esc(w.gust ?? '')}"></div>
