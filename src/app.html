@@ -1199,7 +1199,7 @@ function renderDraws(){
   const h = (DATA.harvest || {}).files || [];
   const prior = $('#ticket') ? $('#ticket').value : '';
   $('#drawview').innerHTML = `<div class="pad">
-    <div><div class="kicker">In-person vacancy draws</div><h2>Find your ticket</h2><p class="quiet"><span id="fresh">${esc(freshText())}</span>. Checked about every 5 minutes from 8 to 9 PM Pacific.</p></div>
+    <div><div class="kicker">In-person vacancy draws</div><h2>Find your ticket</h2><p class="quiet"><span id="fresh">${esc(freshText())}</span>. New lists can take up to an hour or more to appear here. For the newest results, check the CDFW draw page or the check station.</p></div>
     <form id="tform"><label for="ticket">Ticket number</label><input class="mono" type="text" id="ticket" inputmode="numeric" autocomplete="off" placeholder="VDR-0000014833" value="${esc(prior)}"></form>
     <div id="hit" class="card" hidden aria-live="polite"></div>
     <section><h3>Latest lists</h3>
