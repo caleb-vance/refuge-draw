@@ -144,6 +144,7 @@ li.past .when,li.past .what{opacity:.5}
 li.key .when{color:var(--accent)}
 .what b{display:block;font-weight:700}
 .what{min-width:0;font-size:15px}
+select{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;max-width:300px}
 input[type=date],input[type=text]{font:500 16px var(--body);padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);width:100%;max-width:260px}
 input.mono{font-family:var(--mono);max-width:none}
 label{font-weight:500;font-size:14px;display:block;margin-bottom:4px}
@@ -221,6 +222,7 @@ const REFUGES = /*REFUGES*/null;
 let DATA = /*SNAPSHOT*/null;
 const OVERLAYS = /*OVERLAYS*/null;
 const LAST_SEASON = /*LAST*/null;
+const BLINDS = /*BLINDS*/null;
 const LICENSE_URL = 'https://www.licenses.wildlife.ca.gov/internetsales';
 const INFO_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=70431&inline';
 const NEWS_URL = 'https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=70409&inline';
@@ -755,7 +757,39 @@ function speciesBars(sp, days){
   const list = Object.entries(sp).sort((a, b) => b[1] - a[1]).slice(0, 8);
   return list.length ? `<div class="bars">${list.map(([s, n]) => `<div class="bar sp"><span>${esc(SPECIES[s] || s)}</span><i style="width:${Math.round(n / days * 100)}%"></i><span>${n}</span></div>`).join('')}</div>` : '<p class="quiet">No species reported.</p>';
 }
+let blindSeason = 0, blindView = 'blind', blindDate = null, blindRefuge = null;
+const perHunter = (b, h) => h ? (b / h).toFixed(1) : '–';
+function blindSection(r){
+  const seasons = BLINDS[r.id];
+  if (!seasons || !seasons.length) return '';
+  if (blindRefuge !== r.id) { blindRefuge = r.id; blindSeason = 0; blindView = 'blind'; blindDate = null; }
+  const s = seasons[blindSeason] || seasons[0];
+  if (!s.dates.includes(blindDate)) blindDate = s.dates[s.dates.length - 1];
+  const dayLabel = (d, o) => fmt(fromISO(d), o || {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+  const seasonSeg = seasons.length > 1 ? `<div class="seg">${seasons.map((x, i) => `<button data-bs="${i}" aria-pressed="${x === s}">${esc(x.season)}</button>`).join('')}</div>` : '';
+  let body;
+  if (blindView === 'day') {
+    const i = s.dates.indexOf(blindDate);
+    const rows = Object.entries(s.blinds).map(([n, v]) => [n, v.find(e => e[0] === i)]).filter(x => x[1]).sort((x, y) => y[1][2] / y[1][1] - x[1][2] / x[1][1] || y[1][2] - x[1][2]);
+    const hs = rows.reduce((t, x) => t + x[1][1], 0), bs = rows.reduce((t, x) => t + x[1][2], 0);
+    body = `<div><label for="blindday">Hunt day</label><select id="blindday">${s.dates.map(d => `<option value="${d}"${d === blindDate ? ' selected' : ''}>${esc(dayLabel(d))}</option>`).join('')}</select></div>
+      <p class="quiet">${rows.length} blinds hunted: ${num(hs)} hunters, ${num(bs)} birds, ${perHunter(bs, hs)} birds per hunter.</p>
+      <div class="card scroll"><table><thead><tr><th>Blind</th><th class="n">Hunters</th><th class="n">Birds</th><th class="n">Per hunter</th></tr></thead><tbody>${rows.map(([n, e]) => `<tr><td>${esc(n)}</td><td class="n">${e[1]}</td><td class="n">${e[2]}</td><td class="n">${perHunter(e[2], e[1])}</td></tr>`).join('')}</tbody></table></div>`;
+  } else {
+    const list = Object.entries(s.blinds).map(([n, v]) => ({n, v, h:v.reduce((t, e) => t + e[1], 0), b:v.reduce((t, e) => t + e[2], 0)})).sort((x, y) => y.b / y.h - x.b / x.h);
+    body = `<p class="quiet">Highest season average first. Tap a blind to see each day.</p>` + list.map(x => `<details><summary><div>Blind ${esc(x.n)}</div><span>${perHunter(x.b, x.h)} birds per hunter</span></summary><div class="inner"><p class="quiet">${num(x.b)} birds, ${num(x.h)} hunters, ${x.v.length} days hunted.</p><div class="scroll"><table><thead><tr><th>Date</th><th class="n">Hunters</th><th class="n">Birds</th><th class="n">Per hunter</th></tr></thead><tbody>${x.v.map(e => `<tr><td>${esc(dayLabel(s.dates[e[0]], {month:'short', day:'numeric'}))}</td><td class="n">${e[1]}</td><td class="n">${e[2]}</td><td class="n">${perHunter(e[2], e[1])}</td></tr>`).join('')}</tbody></table></div></div></details>`).join('');
+  }
+  return `<section id="blindbox"><h3>Results by blind</h3>
+    <div class="warn">The newest blind results we can find online are from ${esc(seasons[0].season)}. Water and ponds change, so use these to compare blinds, not to predict this season.</div>
+    ${seasonSeg}
+    <div class="seg"><button data-bv="blind" aria-pressed="${blindView === 'blind'}">By blind</button><button data-bv="day" aria-pressed="${blindView === 'day'}">By day</button></div>
+    ${body}
+    <p class="quiet">Regular season only. A blind with few hunters can show a very high average. ${link(s.url, 'Official USFWS PDF')}</p></section>`;
+}
 function birdPage(r){
+  return birdSummary(r) + blindSection(r);
+}
+function birdSummary(r){
   const s = seasonStats(r), l = lastStats(r);
   if (!s && !l) return '<p class="quiet">CDFW has not published hunt results for this unit in the files we read.</p>';
   let html = '';
@@ -906,6 +940,9 @@ function openDetail(id, keepScroll){
   el.scrollTop = keepScroll ? scroll : 0;
   $('#back').onclick = closeDetail;
   const fk = $('#fullkey'); if (fk) fk.onclick = () => { const v = $('#viewer'), cur = activeOverlayMeta || ovs[0] || FULL_MAP[id]; v.innerHTML = `<button class="btn main" id="vclose">Close</button><img src="${esc(cur.img)}" alt="${esc(cur.label)}">`; v.hidden = false; $('#vclose').onclick = () => { v.hidden = true; }; };
+  el.querySelectorAll('[data-bs]').forEach(b => { b.onclick = () => { blindSeason = +b.dataset.bs; openDetail(id, true); }; });
+  el.querySelectorAll('[data-bv]').forEach(b => { b.onclick = () => { blindView = b.dataset.bv; openDetail(id, true); }; });
+  const bd = $('#blindday'); if (bd) bd.onchange = () => { blindDate = bd.value; openDetail(id, true); };
   el.querySelectorAll('[data-pane]').forEach(b => { b.onclick = () => { detailPane = b.dataset.pane; openDetail(id, true); }; });
   el.querySelectorAll('[data-ov]').forEach(b => { b.onclick = () => setOverlay(ovs.find(o => o.img === b.dataset.ov)); });
   document.querySelectorAll('[data-ov]').forEach(b => b.setAttribute('aria-pressed', !!activeOverlayMeta && b.dataset.ov === activeOverlayMeta.img));
@@ -941,6 +978,7 @@ function renderHow(){
       <li>You can enter only one lottery per hunt day.</li>
       <li>On hunt morning, reservations check in first, then lottery entries in draw order, then any first-come line.</li>
     </ul></section>
+    <section><h3>Blind results</h3><p>Sacramento, Delevan, Colusa and Sutter have results by blind on their Birds pages, from the newest files USFWS has online. Other refuges may post theirs at the check station.</p></section>
     <section><h3>How the odds work</h3><p>Odds are for the in-person lottery on the same weekday. We take the people who put in on the last matching hunt, then divide the estimated lottery spots by that number. CDFW doesn't publish spots by date, so spots are estimated from the hunters it reported that day. Numbers appear after CDFW posts hunt results, which can lag about a week.</p></section>
     <section><h3>What everyone needs</h3><ul class="plain">
       <li>California hunting license</li>

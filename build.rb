@@ -27,6 +27,7 @@ html = File.read(File.join(ROOT, 'src/app.html'))
 html = html.sub('/*LEAFLET_CSS*/') { File.read(File.join(ROOT, 'src/leaflet.css')) }
 html = html.sub('/*REFUGES*/null') { safe.call(JSON.generate(JSON.parse(File.read(File.join(ROOT, 'src/refuges.json'))))) }
 html = html.sub('/*LAST*/null') { safe.call(File.read(last)) }
+html = html.sub('/*BLINDS*/null') { safe.call(File.read(File.join(ROOT, 'public/blinds.json'))) }
 html = html.sub('/*OVERLAYS*/null') { safe.call(File.read(File.join(ROOT, 'src/overlays.json'))) }
 html = html.sub('/*SNAPSHOT*/null') { safe.call(File.read(SNAP)) }
 File.write(File.join(ROOT, 'public/index.html'), html)

@@ -78,7 +78,8 @@ module PdfText
     fd.to_s.scan(%r{/([\w.+-]+)\s+(\d+) 0 R}) do |name, n|
       tu = objs[n.to_i].to_s[%r{/ToUnicode\s+(\d+) 0 R}, 1]
       data = tu && stream_of(objs[tu.to_i].to_s)
-      fonts[name] = { map: data ? cmap(data) : nil, two: data ? data.match?(/<\h{4}>/) : false }
+      # Only composite fonts use two-byte codes. A simple font's cmap can still declare a <0000> <FFFF> range.
+      fonts[name] = { map: data ? cmap(data) : nil, two: objs[n.to_i].to_s.b.match?(%r{/Subtype\s*/Type0}) }
     end
     fonts
   end
@@ -155,6 +156,18 @@ module PdfText
       end
     end
     cells
+  end
+
+  # Positioned cells for each page, in file order.
+  def page_list(pdf)
+    pdf = pdf.b
+    objs = objects(pdf)
+    pages = objs.select { |_, b| b.to_s =~ %r{/Type\s*/Page(?![s\w])} }.sort_by { |n, _| [pdf.index("#{n} 0 obj") || 0, n] }
+    pages.map do |_, page|
+      fonts = fonts_for(page, objs)
+      refs = page[%r{/Contents\s*\[(.*?)\]}m, 1]&.scan(/(\d+) 0 R/)&.flatten || [page[%r{/Contents\s+(\d+) 0 R}, 1]].compact
+      page_cells(refs.map { |r| stream_of(objs[r.to_i].to_s) }.compact.join("\n"), fonts)
+    end
   end
 
   # Merges cells sharing a baseline; adjoining cells only split when separated by a real gap.

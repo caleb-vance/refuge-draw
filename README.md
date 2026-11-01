@@ -13,3 +13,5 @@ Prototype guide to California refuge waterfowl lotteries. It uses the Ruby that 
 Map layers: `ruby tools/overlays.rb` renders GPS-tagged hunt map PDFs to `public/overlays/` and pulls official USFWS and CDFW boundaries to `public/boundaries.json`. Rerun it when CDFW posts new maps. It needs macOS for PDF rendering.
 
 Hosting: `.github/workflows/deploy.yml` publishes `site/` to GitHub Pages and refreshes CDFW data every 30 minutes. In the repo, set Settings > Pages > Source to GitHub Actions.
+
+Blind results: `ruby tools/blinds.rb` reads USFWS blind-by-blind PDFs into `public/blinds.json`. Rerun it and add new file names when USFWS posts a newer season.
